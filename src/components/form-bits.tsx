@@ -1,4 +1,5 @@
 import { CircleAlert, CircleCheck } from "lucide-react";
+import { AvatarUpload } from "@/components/avatar-upload";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { ActionResult } from "@/lib/types";
@@ -45,10 +46,11 @@ type ProfileDefaults = {
 
 export function ProfileFields({
   defaults = {},
-  withAvatar = false,
+  avatarUserId,
 }: {
   defaults?: ProfileDefaults;
-  withAvatar?: boolean;
+  /** Si se pasa, muestra el selector de foto (requiere sesión iniciada). */
+  avatarUserId?: string;
 }) {
   return (
     <>
@@ -67,14 +69,11 @@ export function ProfileFields({
         hint="Es como vas a aparecer en el ranking."
         defaultValue={defaults.nickname}
       />
-      {withAvatar && (
-        <Field
-          label="Foto (URL, opcional)"
-          name="avatar_url"
-          type="url"
-          placeholder="https://…"
-          hint="Si la dejás vacía se muestran tus iniciales."
-          defaultValue={defaults.avatar_url ?? ""}
+      {avatarUserId && (
+        <AvatarUpload
+          userId={avatarUserId}
+          defaultUrl={defaults.avatar_url ?? null}
+          name={{ first_name: defaults.first_name ?? "", last_name: defaults.last_name ?? "" }}
         />
       )}
     </>

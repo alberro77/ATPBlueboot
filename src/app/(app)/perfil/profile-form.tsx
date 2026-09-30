@@ -27,7 +27,7 @@ export function ProfileForm({ profile }: { profile: Profile }) {
             </div>
           </div>
           <form action={action} className="grid gap-4">
-            <ProfileFields defaults={profile} withAvatar />
+            <ProfileFields defaults={profile} avatarUserId={profile.id} />
             <FormMessage state={state} />
             <Button type="submit" size="lg" className="h-10" disabled={pending}>
               {pending && <Loader2 className="animate-spin" />}

@@ -13,6 +13,7 @@ export default async function OnboardingPage() {
   const meta = user.user_metadata ?? {};
   return (
     <OnboardingForm
+      userId={user.id}
       defaults={{
         first_name: meta.first_name ?? "",
         last_name: meta.last_name ?? "",

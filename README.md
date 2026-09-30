@@ -8,7 +8,7 @@ Ranking ELO de ping pong de BlueBoot. Mobile-first, hecho con Next.js 16 (App Ro
 - **Cargar partido**: elegís al rival, cargás el marcador y ves cuántos puntos ganarías o perderías.
 - **Mis partidos**: partidos que te toca confirmar o rechazar, los que esperan a tu rival (los podés cancelar) y tu historial.
 - **Historial**: todos los partidos confirmados de la empresa, paginados.
-- **Perfil**: nombre, apellido, apodo y URL de foto.
+- **Perfil**: nombre, apellido, apodo y foto. La foto se recorta en cuadrado y se comprime a 256×256 WebP (~30 KB) en el navegador antes de subirse a Supabase Storage; el bucket rechaza archivos de más de 512 KB o que no sean imágenes.
 
 ## Reglas de negocio
 

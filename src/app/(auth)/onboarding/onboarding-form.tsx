@@ -8,8 +8,10 @@ import { FormMessage, ProfileFields } from "@/components/form-bits";
 import { createProfile, signOut } from "../actions";
 
 export function OnboardingForm({
+  userId,
   defaults,
 }: {
+  userId: string;
   defaults: { first_name: string; last_name: string; nickname: string };
 }) {
   const [state, action, pending] = useActionState(createProfile, null);
@@ -22,7 +24,7 @@ export function OnboardingForm({
       </CardHeader>
       <CardContent>
         <form action={action} className="grid gap-4">
-          <ProfileFields defaults={defaults} withAvatar />
+          <ProfileFields defaults={defaults} avatarUserId={userId} />
           <FormMessage state={state} />
           <Button type="submit" size="lg" className="h-10" disabled={pending}>
             {pending && <Loader2 className="animate-spin" />}

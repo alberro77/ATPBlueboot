@@ -1,3 +1,5 @@
+import { AVATAR_PUBLIC_PREFIX } from "@/lib/avatar";
+
 export type ProfileInput = {
   first_name: string;
   last_name: string;
@@ -17,8 +19,9 @@ export function parseProfileForm(
   if (!last_name || last_name.length > 50) return { ok: false, error: "Ingresá tu apellido." };
   if (nickname.length < 2 || nickname.length > 20)
     return { ok: false, error: "El apodo tiene que tener entre 2 y 20 caracteres." };
-  if (avatarRaw && !/^https?:\/\//i.test(avatarRaw))
-    return { ok: false, error: "La URL de la foto tiene que empezar con http:// o https://" };
+  // Solo se aceptan fotos subidas a nuestro bucket (ya recortadas y con tamaño limitado).
+  if (avatarRaw && !avatarRaw.startsWith(AVATAR_PUBLIC_PREFIX))
+    return { ok: false, error: "La foto no es válida. Volvé a subirla." };
 
   return { ok: true, data: { first_name, last_name, nickname, avatar_url: avatarRaw || null } };
 }
