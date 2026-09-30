@@ -92,7 +92,7 @@ export default async function RankingPage({ searchParams }: PageProps<"/">) {
         </TabsContent>
       </Tabs>
       <p className="mt-4 text-center text-xs text-muted-foreground">
-        Singles y dobles tienen ELO independiente. Inactividad: después de 14 días sin jugar en una modalidad se
+        Singles y dobles tienen ELO independiente. Inactividad: después de 7 días sin jugar en una modalidad se
         descuentan 10 puntos por semana en esa modalidad.
       </p>
     </>

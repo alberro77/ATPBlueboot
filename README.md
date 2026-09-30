@@ -21,7 +21,7 @@ Todas viven en la base de datos (`supabase/schema.sql`), en funciones `security 
 | ELO inicial 1000, K = 32 | `E = 1/(1+10^((Rb-Ra)/400))`, `Δ = round(32·(1-E))`, suma cero. En dobles, `Ra`/`Rb` son el promedio del `elo_doubles` de cada equipo y los 4 jugadores suman o restan el mismo Δ |
 | Doble validación | `report_match()` / `report_doubles_match()` crean el partido como `pending`. Confirma o rechaza el rival; en dobles alcanza con cualquiera de los dos integrantes del equipo rival. El ELO cambia recién al confirmar |
 | Mínimo 3 partidos | 3+ partidos confirmados **en esa modalidad** para entrar a su ranking oficial |
-| Decay por inactividad | Por modalidad. Clasificado con 14+ días sin partidos confirmados en esa modalidad: −10 por cada semana de inactividad (a los 14 días, −20; a los 21, −30 acumulado). Lo aplica `apply_inactivity_decay()` a diario vía `pg_cron` y también cada vez que se abre el ranking. Es idempotente |
+| Decay por inactividad | Por modalidad. Clasificado con 7+ días sin partidos confirmados en esa modalidad: −10 por cada semana de inactividad (a los 7 días, −10; a los 14, −20 acumulado; etc.). Lo aplica `apply_inactivity_decay()` a diario vía `pg_cron` y también cada vez que se abre el ranking. Es idempotente |
 | Marcador válido | Sin empates, el ganador llega al menos a 11 y gana por 2 o más puntos de diferencia |
 
 ## Puesta en marcha

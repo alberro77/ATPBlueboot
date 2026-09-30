@@ -13,9 +13,9 @@
 --   · Los partidos se cargan como 'pending' y solo impactan el ELO cuando
 --     el rival (en dobles: cualquiera de los dos rivales) los confirma.
 --   · Clasificado = 3 o más partidos confirmados en esa modalidad.
---   · Decay por modalidad: un jugador clasificado con 14+ días sin partidos
+--   · Decay por modalidad: un jugador clasificado con 7+ días sin partidos
 --     confirmados en esa modalidad pierde 10 puntos por cada semana de
---     inactividad transcurrida (a los 14 días: -20; a los 21: -30 acumulado).
+--     inactividad transcurrida (a los 7 días: -10; a los 14: -20 acumulado; etc.).
 -- =====================================================================
 
 create schema if not exists private;
@@ -197,7 +197,7 @@ begin
       from public.profiles where id = p_profile_id for update;
   end if;
 
-  if not found or v_played < 3 or v_last is null or now() - v_last < interval '14 days' then
+  if not found or v_played < 3 or v_last is null or now() - v_last < interval '7 days' then
     return 0;
   end if;
 
@@ -241,13 +241,13 @@ begin
     select id, 'singles'::public.match_mode as mode
       from public.profiles
      where matches_played >= 3
-       and last_match_at < now() - interval '14 days'
+       and last_match_at < now() - interval '7 days'
        and floor(extract(epoch from now() - last_match_at) / 604800) > decay_weeks_applied
     union all
     select id, 'doubles'::public.match_mode
       from public.profiles
      where doubles_played >= 3
-       and doubles_last_match_at < now() - interval '14 days'
+       and doubles_last_match_at < now() - interval '7 days'
        and floor(extract(epoch from now() - doubles_last_match_at) / 604800) > doubles_decay_weeks_applied
      order by 1
   loop
