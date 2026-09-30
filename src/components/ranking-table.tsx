@@ -2,7 +2,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { PlayerAvatar } from "@/components/player-avatar";
 import { fullName } from "@/lib/format";
 import { MIN_MATCHES_TO_RANK } from "@/lib/elo";
-import type { Profile } from "@/lib/types";
+import { statsFor } from "@/lib/modes";
+import type { Mode, Profile } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 const PODIUM = [
@@ -27,10 +28,12 @@ function Position({ index, ranked }: { index: number; ranked: boolean }) {
 
 export function RankingTable({
   players,
+  mode,
   currentUserId,
   ranked,
 }: {
   players: Profile[];
+  mode: Mode;
   currentUserId: string;
   ranked: boolean;
 }) {
@@ -47,7 +50,9 @@ export function RankingTable({
           </TableRow>
         </TableHeader>
         <TableBody>
-          {players.map((p, i) => (
+          {players.map((p, i) => {
+            const s = statsFor(p, mode);
+            return (
             <TableRow key={p.id} className={cn(p.id === currentUserId && "bg-accent/60 hover:bg-accent")}>
               <TableCell className="text-center">
                 <Position index={i} ranked={ranked} />
@@ -64,22 +69,23 @@ export function RankingTable({
                     </div>
                     <div className="truncate text-xs text-muted-foreground">
                       {fullName(p)}
-                      <span className="sm:hidden"> · {p.matches_played} PJ</span>
+                      <span className="sm:hidden"> · {s.played} PJ</span>
                     </div>
                   </div>
                 </div>
               </TableCell>
               <TableCell className="hidden text-center tabular-nums sm:table-cell">
-                {ranked ? p.matches_played : `${p.matches_played}/${MIN_MATCHES_TO_RANK}`}
+                {ranked ? s.played : `${s.played}/${MIN_MATCHES_TO_RANK}`}
               </TableCell>
               <TableCell className="text-center tabular-nums">
-                <span className="text-success">{p.wins}</span>
+                <span className="text-success">{s.wins}</span>
                 <span className="text-muted-foreground">/</span>
-                <span className="text-destructive">{p.losses}</span>
+                <span className="text-destructive">{s.losses}</span>
               </TableCell>
-              <TableCell className="pr-4 text-right text-base font-bold tabular-nums">{p.elo}</TableCell>
+              <TableCell className="pr-4 text-right text-base font-bold tabular-nums">{s.elo}</TableCell>
             </TableRow>
-          ))}
+            );
+          })}
         </TableBody>
       </Table>
     </div>

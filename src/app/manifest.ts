@@ -2,13 +2,26 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
+    id: "/",
     name: "Ping Pong BlueBoot",
     short_name: "Ping Pong",
     description: "Ranking ELO de ping pong de BlueBoot.",
+    lang: "es",
     start_url: "/",
+    scope: "/",
     display: "standalone",
+    orientation: "portrait",
     background_color: "#ffffff",
     theme_color: "#028BB8",
-    icons: [{ src: "/icon.svg", sizes: "any", type: "image/svg+xml" }],
+    categories: ["sports", "games"],
+    icons: [
+      { src: "/icons/icon-192.png", sizes: "192x192", type: "image/png", purpose: "any" },
+      { src: "/icons/icon-512.png", sizes: "512x512", type: "image/png", purpose: "any" },
+      { src: "/icons/icon-maskable-512.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
+    ],
+    shortcuts: [
+      { name: "Cargar partido", url: "/cargar", icons: [{ src: "/icons/icon-192.png", sizes: "192x192" }] },
+      { name: "Mis partidos", url: "/mis-partidos", icons: [{ src: "/icons/icon-192.png", sizes: "192x192" }] },
+    ],
   };
 }

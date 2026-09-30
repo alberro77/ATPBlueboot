@@ -4,9 +4,10 @@ Ranking ELO de ping pong de BlueBoot. Mobile-first, hecho con Next.js 16 (App Ro
 
 ## Funcionalidades
 
-- **Ranking**: ranking oficial (3+ partidos confirmados) y pestaña "En evaluación" para quienes tienen menos de 3. Muestra avatar o iniciales, apodo, nombre, ELO, PJ y V/D.
-- **Cargar partido**: elegís al rival, cargás el marcador y ves cuántos puntos ganarías o perderías.
-- **Mis partidos**: partidos que te toca confirmar o rechazar, los que esperan a tu rival (los podés cancelar) y tu historial.
+- **Ranking**: selector **Singles (1v1) / Dobles (2v2)**, cada uno con su ranking oficial (3+ partidos confirmados en esa modalidad) y su pestaña "Sin clasificar". Muestra avatar o iniciales, apodo, nombre, ELO, PJ y V/D.
+- **Cargar partido**: elegís modalidad; en 1v1 el rival, en 2v2 tu compañero y los dos rivales. Cargás el marcador y ves cuántos puntos ganarías o perderías.
+- **Mis partidos**: estadísticas de ambas modalidades, partidos que te toca confirmar o rechazar, los que esperan al rival (los podés cancelar si los cargaste vos) y tu historial.
+- **App instalable (PWA)**: desde el celular se puede agregar a la pantalla de inicio y abre a pantalla completa. En Android/Chrome aparece un botón "Instalar"; en iPhone, la app muestra cómo hacerlo (Compartir → Agregar a inicio).
 - **Historial**: todos los partidos confirmados de la empresa, paginados.
 - **Perfil**: nombre, apellido, apodo y foto. La foto se recorta en cuadrado y se comprime a 256×256 WebP (~30 KB) en el navegador antes de subirse a Supabase Storage; el bucket rechaza archivos de más de 512 KB o que no sean imágenes.
 
@@ -16,10 +17,11 @@ Todas viven en la base de datos (`supabase/schema.sql`), en funciones `security 
 
 | Regla | Implementación |
 | --- | --- |
-| ELO inicial 1000, K = 32 | `confirm_match()`: `E = 1/(1+10^((Rb-Ra)/400))`, `Δ = round(32·(1-E))`, suma cero |
-| Doble validación | `report_match()` crea el partido como `pending`; solo el rival puede llamar a `confirm_match()` / `reject_match()`. El ELO cambia recién al confirmar |
-| Mínimo 3 partidos | `matches_played >= 3` para entrar al ranking oficial |
-| Decay por inactividad | Clasificado con 14+ días sin partidos confirmados: −10 por cada semana de inactividad (a los 14 días, −20; a los 21, −30 acumulado). Lo aplica `apply_inactivity_decay()` a diario vía `pg_cron` y también cada vez que se abre el ranking. Es idempotente |
+| Dos modalidades | `elo` (singles) y `elo_doubles` (dobles) son independientes, igual que PJ, V/D y el decay |
+| ELO inicial 1000, K = 32 | `E = 1/(1+10^((Rb-Ra)/400))`, `Δ = round(32·(1-E))`, suma cero. En dobles, `Ra`/`Rb` son el promedio del `elo_doubles` de cada equipo y los 4 jugadores suman o restan el mismo Δ |
+| Doble validación | `report_match()` / `report_doubles_match()` crean el partido como `pending`. Confirma o rechaza el rival; en dobles alcanza con cualquiera de los dos integrantes del equipo rival. El ELO cambia recién al confirmar |
+| Mínimo 3 partidos | 3+ partidos confirmados **en esa modalidad** para entrar a su ranking oficial |
+| Decay por inactividad | Por modalidad. Clasificado con 14+ días sin partidos confirmados en esa modalidad: −10 por cada semana de inactividad (a los 14 días, −20; a los 21, −30 acumulado). Lo aplica `apply_inactivity_decay()` a diario vía `pg_cron` y también cada vez que se abre el ranking. Es idempotente |
 | Marcador válido | Sin empates, el ganador llega al menos a 11 y gana por 2 o más puntos de diferencia |
 
 ## Puesta en marcha

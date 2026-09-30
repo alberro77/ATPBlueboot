@@ -1,7 +1,8 @@
 import { Badge } from "@/components/ui/badge";
 import { PlayerAvatar } from "@/components/player-avatar";
 import { formatDate, fullName, signed } from "@/lib/format";
-import type { MatchStatus, MatchWithPlayers, PlayerSummary } from "@/lib/types";
+import { MODE_SHORT } from "@/lib/modes";
+import type { MatchStatus, MatchWithPlayers, Mode, PlayerSummary } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 const STATUS_LABEL: Record<MatchStatus, string> = {
@@ -25,17 +26,53 @@ export function StatusBadge({ status }: { status: MatchStatus }) {
   );
 }
 
-/** Un partido visto desde un jugador: rival, resultado y ELO ganado/perdido. */
+export function ModeBadge({ mode }: { mode: Mode }) {
+  return (
+    <Badge
+      variant="outline"
+      className={cn("px-1.5 font-semibold", mode === "doubles" && "border-primary/40 text-primary")}
+    >
+      {MODE_SHORT[mode]}
+    </Badge>
+  );
+}
+
+export function teamA(m: MatchWithPlayers): PlayerSummary[] {
+  return m.reporter_partner ? [m.reporter, m.reporter_partner] : [m.reporter];
+}
+
+export function teamB(m: MatchWithPlayers): PlayerSummary[] {
+  return m.opponent_partner ? [m.opponent, m.opponent_partner] : [m.opponent];
+}
+
+export function teamName(players: PlayerSummary[]) {
+  return players.map((p) => p.nickname).join(" & ");
+}
+
+/** Un partido visto desde un jugador: su equipo, los rivales, el resultado y el ELO ganado/perdido. */
 export function perspective(match: MatchWithPlayers, playerId: string) {
-  const isReporter = match.reporter_id === playerId;
-  const won = match.winner_id === playerId;
+  const onTeamA = match.reporter_id === playerId || match.reporter_partner_id === playerId;
+  const teamAWon = match.reporter_score > match.opponent_score;
+  const won = onTeamA === teamAWon;
+  const myTeam = onTeamA ? teamA(match) : teamB(match);
   return {
     won,
-    rival: isReporter ? match.opponent : match.reporter,
-    myScore: isReporter ? match.reporter_score : match.opponent_score,
-    rivalScore: isReporter ? match.opponent_score : match.reporter_score,
+    partner: myTeam.find((p) => p.id !== playerId) ?? null,
+    rivals: onTeamA ? teamB(match) : teamA(match),
+    myScore: onTeamA ? match.reporter_score : match.opponent_score,
+    rivalScore: onTeamA ? match.opponent_score : match.reporter_score,
     delta: match.elo_delta === null ? null : won ? match.elo_delta : -match.elo_delta,
   };
+}
+
+export function TeamAvatars({ players, size = "default" }: { players: PlayerSummary[]; size?: "sm" | "default" | "lg" }) {
+  return (
+    <div className="flex shrink-0 -space-x-2">
+      {players.map((p) => (
+        <PlayerAvatar key={p.id} player={p} size={size} className="ring-2 ring-card" />
+      ))}
+    </div>
+  );
 }
 
 /** Fila de "Mis partidos": desde el punto de vista del usuario. */
@@ -52,7 +89,7 @@ export function MyMatchRow({
   const confirmed = match.status === "confirmed";
   return (
     <li className="flex items-center gap-3 px-4 py-3">
-      <PlayerAvatar player={p.rival} />
+      <TeamAvatars players={p.rivals} />
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
           <span
@@ -63,10 +100,12 @@ export function MyMatchRow({
           >
             {p.won ? "Victoria" : "Derrota"}
           </span>
-          <span className="truncate text-sm">vs {p.rival.nickname}</span>
+          <span className="truncate text-sm">vs {teamName(p.rivals)}</span>
         </div>
-        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          {formatDate(match.created_at)}
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+          <ModeBadge mode={match.mode} />
+          {p.partner && <span>con {p.partner.nickname}</span>}
+          <span>{formatDate(match.created_at)}</span>
           {!confirmed && <StatusBadge status={match.status} />}
         </div>
       </div>
@@ -86,66 +125,63 @@ export function MyMatchRow({
 }
 
 function Side({
-  player,
-  score,
+  players,
   winner,
   delta,
   align,
 }: {
-  player: PlayerSummary;
-  score: number;
+  players: PlayerSummary[];
   winner: boolean;
   delta: number | null;
   align: "left" | "right";
 }) {
+  const single = players.length === 1 ? players[0] : null;
   return (
     <div className={cn("flex min-w-0 items-center gap-2", align === "right" && "flex-row-reverse text-right")}>
-      <PlayerAvatar player={player} size="sm" className="hidden sm:flex" />
+      <div className="hidden sm:flex">
+        <TeamAvatars players={players} size="sm" />
+      </div>
       <div className="min-w-0">
         <div className={cn("truncate text-sm", winner ? "font-bold" : "text-muted-foreground")}>
-          {player.nickname}
+          {teamName(players)}
         </div>
-        <div className="hidden truncate text-xs text-muted-foreground sm:block">{fullName(player)}</div>
+        {single && <div className="hidden truncate text-xs text-muted-foreground sm:block">{fullName(single)}</div>}
         {delta !== null && (
           <div className={cn("text-xs font-semibold tabular-nums", delta >= 0 ? "text-success" : "text-destructive")}>
             {signed(delta)}
+            {players.length > 1 && " c/u"}
           </div>
         )}
       </div>
-      <span className="sr-only">{score} puntos</span>
     </div>
   );
 }
 
-/** Fila neutral para el historial general: jugador izquierdo · marcador · jugador derecho. */
+/** Fila neutral para el historial general: ganador · marcador · perdedor. */
 export function MatchRow({ match }: { match: MatchWithPlayers }) {
-  const winnerIsReporter = match.winner_id === match.reporter_id;
-  const [left, right] = winnerIsReporter
-    ? [
-        { player: match.reporter, score: match.reporter_score },
-        { player: match.opponent, score: match.opponent_score },
-      ]
-    : [
-        { player: match.opponent, score: match.opponent_score },
-        { player: match.reporter, score: match.reporter_score },
-      ];
+  const teamAWon = match.reporter_score > match.opponent_score;
+  const [winners, losers] = teamAWon ? [teamA(match), teamB(match)] : [teamB(match), teamA(match)];
+  const [winScore, loseScore] = teamAWon
+    ? [match.reporter_score, match.opponent_score]
+    : [match.opponent_score, match.reporter_score];
   const delta = match.elo_delta;
 
   return (
     <li className="px-4 py-3">
       <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
-        <Side player={left.player} score={left.score} winner delta={delta} align="left" />
+        <Side players={winners} winner delta={delta} align="left" />
         <div className="text-center">
           <div className="text-lg font-bold tabular-nums">
-            {left.score}
+            {winScore}
             <span className="mx-1 text-muted-foreground">-</span>
-            {right.score}
+            {loseScore}
           </div>
-          <div className="text-[0.7rem] text-muted-foreground">
+          <div className="flex items-center justify-center gap-1 text-[0.7rem] text-muted-foreground">
+            <ModeBadge mode={match.mode} />
             {formatDate(match.resolved_at ?? match.created_at)}
           </div>
         </div>
-        <Side player={right.player} score={right.score} winner={false} delta={delta === null ? null : -delta} align="right" />
+        <Side players={losers} winner={false} delta={delta === null ? null : -delta} align="right" />
       </div>
     </li>
   );

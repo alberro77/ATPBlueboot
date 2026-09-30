@@ -2,14 +2,14 @@ import type { Metadata } from "next";
 import { Clock, Hourglass, Inbox, TrendingDown } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState, PageHeader } from "@/components/page-header";
-import { PlayerAvatar } from "@/components/player-avatar";
 import { CancelButton, ConfirmRejectButtons } from "@/components/match-actions";
-import { MyMatchRow, perspective } from "@/components/match-views";
-import { getSession, MATCH_FIELDS } from "@/lib/data";
+import { ModeBadge, MyMatchRow, perspective, TeamAvatars, teamName } from "@/components/match-views";
+import { getSession, involving, MATCH_FIELDS } from "@/lib/data";
 import { eloDelta, MIN_MATCHES_TO_RANK } from "@/lib/elo";
 import { daysAgoIso, formatDate, fullName, signed } from "@/lib/format";
+import { MODE_LABEL, statsFor } from "@/lib/modes";
 import { createClient } from "@/lib/supabase/server";
-import type { EloEvent, MatchWithPlayers, Profile } from "@/lib/types";
+import type { EloEvent, MatchWithPlayers, Mode, PlayerSummary, Profile } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Mis partidos" };
@@ -23,12 +23,12 @@ export default async function MyMatchesPage() {
     supabase
       .from("matches")
       .select(MATCH_FIELDS)
-      .or(`reporter_id.eq.${me.id},opponent_id.eq.${me.id}`)
+      .or(involving(me.id))
       .order("created_at", { ascending: false })
       .limit(100),
     supabase
       .from("elo_events")
-      .select("id, kind, delta, elo_after, created_at")
+      .select("id, kind, mode, delta, elo_after, created_at")
       .eq("profile_id", me.id)
       .eq("kind", "decay")
       .gte("created_at", daysAgoIso(30))
@@ -37,25 +37,38 @@ export default async function MyMatchesPage() {
 
   const matches = (matchData ?? []) as unknown as MatchWithPlayers[];
   const decays = (decayData ?? []) as EloEvent[];
-  const toConfirm = matches.filter((m) => m.status === "pending" && m.opponent_id === me.id);
-  const awaiting = matches.filter((m) => m.status === "pending" && m.reporter_id === me.id);
+  const pendingMatches = matches.filter((m) => m.status === "pending");
+  const toConfirm = pendingMatches.filter((m) => m.opponent_id === me.id || m.opponent_partner_id === me.id);
+  const awaiting = pendingMatches.filter((m) => m.reporter_id === me.id || m.reporter_partner_id === me.id);
   const history = matches.filter((m) => m.status !== "pending");
+
+  const decayByMode = (["singles", "doubles"] as Mode[])
+    .map((mode) => ({
+      mode,
+      points: Math.abs(decays.filter((d) => d.mode === mode).reduce((s, d) => s + d.delta, 0)),
+    }))
+    .filter((d) => d.points > 0);
 
   return (
     <div className="mx-auto grid max-w-2xl gap-6">
       <PageHeader title="Mis partidos" />
 
-      <StatsCard profile={me} />
+      <div className="grid gap-3 sm:grid-cols-2">
+        <StatsCard profile={me} mode="singles" />
+        <StatsCard profile={me} mode="doubles" />
+      </div>
 
-      {decays.length > 0 && (
+      {decayByMode.length > 0 && (
         <div className="flex items-start gap-3 rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm">
           <TrendingDown className="mt-0.5 size-4 shrink-0 text-destructive" />
           <div>
-            <p className="font-medium">Penalización por inactividad</p>
-            <p className="text-muted-foreground">
-              Perdiste {Math.abs(decays.reduce((s, d) => s + d.delta, 0))} puntos en los últimos 30 días por no
-              jugar. ¡Cargá un partido para frenarla!
-            </p>
+            <p className="font-medium">Penalización por inactividad (últimos 30 días)</p>
+            {decayByMode.map((d) => (
+              <p key={d.mode} className="text-muted-foreground">
+                {MODE_LABEL[d.mode]}: −{d.points} puntos.
+              </p>
+            ))}
+            <p className="text-muted-foreground">¡Cargá un partido para frenarla!</p>
           </div>
         </div>
       )}
@@ -74,11 +87,16 @@ export default async function MyMatchesPage() {
       {awaiting.length > 0 && (
         <section className="grid gap-3">
           <SectionTitle icon={Hourglass} count={awaiting.length}>
-            Esperando a tu rival
+            Esperando al rival
           </SectionTitle>
           <ul className="divide-y rounded-xl border bg-card">
             {awaiting.map((m) => (
-              <MyMatchRow key={m.id} match={m} playerId={me.id} action={<CancelButton matchId={m.id} />} />
+              <MyMatchRow
+                key={m.id}
+                match={m}
+                playerId={me.id}
+                action={m.reporter_id === me.id ? <CancelButton matchId={m.id} /> : undefined}
+              />
             ))}
           </ul>
         </section>
@@ -120,64 +138,85 @@ function SectionTitle({
   );
 }
 
-function StatsCard({ profile }: { profile: Profile }) {
-  const ranked = profile.matches_played >= MIN_MATCHES_TO_RANK;
+function StatsCard({ profile, mode }: { profile: Profile; mode: Mode }) {
+  const s = statsFor(profile, mode);
+  const ranked = s.played >= MIN_MATCHES_TO_RANK;
   const stats = [
-    { label: "ELO", value: profile.elo, className: "text-primary" },
-    { label: "PJ", value: profile.matches_played },
-    { label: "V", value: profile.wins, className: "text-success" },
-    { label: "D", value: profile.losses, className: "text-destructive" },
+    { label: "ELO", value: s.elo, className: "text-primary" },
+    { label: "PJ", value: s.played },
+    { label: "V", value: s.wins, className: "text-success" },
+    { label: "D", value: s.losses, className: "text-destructive" },
   ];
   return (
     <Card size="sm">
+      <p className="px-4 text-xs font-semibold text-muted-foreground uppercase">{MODE_LABEL[mode]}</p>
       <CardContent className="grid grid-cols-4 divide-x text-center">
-        {stats.map((s) => (
-          <div key={s.label}>
-            <div className={cn("text-2xl font-bold tabular-nums", s.className)}>{s.value}</div>
-            <div className="text-xs text-muted-foreground">{s.label}</div>
+        {stats.map((st) => (
+          <div key={st.label}>
+            <div className={cn("text-2xl font-bold tabular-nums", st.className)}>{st.value}</div>
+            <div className="text-xs text-muted-foreground">{st.label}</div>
           </div>
         ))}
       </CardContent>
       {!ranked && (
         <p className="px-4 text-center text-xs text-muted-foreground">
-          En evaluación: te faltan {MIN_MATCHES_TO_RANK - profile.matches_played} partido(s) confirmados para
-          entrar al ranking oficial.
+          Sin clasificar: te faltan {MIN_MATCHES_TO_RANK - s.played} partido(s) para el ranking oficial.
         </p>
       )}
     </Card>
   );
 }
 
+function teamElo(players: PlayerSummary[], mode: Mode) {
+  if (mode === "singles") return players[0].elo;
+  return players.reduce((sum, p) => sum + p.elo_doubles, 0) / players.length;
+}
+
 function IncomingMatchCard({ match, me }: { match: MatchWithPlayers; me: Profile }) {
   const p = perspective(match, me.id);
-  const preview = p.won ? eloDelta(me.elo, p.rival.elo) : -eloDelta(p.rival.elo, me.elo);
+  const myTeam = p.partner ? [me, p.partner] : [me];
+  const mine = teamElo(myTeam, match.mode);
+  const theirs = teamElo(p.rivals, match.mode);
+  const preview = p.won ? eloDelta(mine, theirs) : -eloDelta(theirs, mine);
+  const reporter = match.reporter;
+  const doubles = match.mode === "doubles";
 
   return (
     <Card className="border-primary/40 ring-2 ring-primary/10">
       <CardHeader className="flex flex-row items-center gap-3">
-        <PlayerAvatar player={p.rival} size="lg" />
+        <TeamAvatars players={p.rivals} size="lg" />
         <div className="min-w-0">
-          <CardTitle className="truncate text-base">{p.rival.nickname}</CardTitle>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <span className="truncate">{teamName(p.rivals)}</span>
+            <ModeBadge mode={match.mode} />
+          </CardTitle>
           <p className="truncate text-xs text-muted-foreground">
-            {fullName(p.rival)} · {formatDate(match.created_at)}
+            {doubles ? `Cargado por ${reporter.nickname}` : fullName(reporter)} · {formatDate(match.created_at)}
           </p>
         </div>
       </CardHeader>
       <CardContent className="grid gap-4">
         <div className="grid grid-cols-[1fr_auto_1fr] items-center rounded-xl bg-muted/60 p-3 text-center">
-          <div>
-            <div className="text-xs text-muted-foreground">Vos</div>
+          <div className="min-w-0">
+            <div className="truncate text-xs text-muted-foreground">
+              {p.partner ? `Vos & ${p.partner.nickname}` : "Vos"}
+            </div>
             <div className={cn("text-3xl font-bold tabular-nums", p.won && "text-success")}>{p.myScore}</div>
           </div>
           <span className="px-3 text-xl text-muted-foreground">–</span>
-          <div>
-            <div className="truncate text-xs text-muted-foreground">{p.rival.nickname}</div>
+          <div className="min-w-0">
+            <div className="truncate text-xs text-muted-foreground">{teamName(p.rivals)}</div>
             <div className={cn("text-3xl font-bold tabular-nums", !p.won && "text-success")}>{p.rivalScore}</div>
           </div>
         </div>
         <p className="text-center text-sm text-muted-foreground">
           Si confirmás:{" "}
-          <b className={preview >= 0 ? "text-success" : "text-destructive"}>{signed(preview)} ELO</b>
+          <b className={preview >= 0 ? "text-success" : "text-destructive"}>
+            {signed(preview)} ELO{doubles && " para cada uno"}
+          </b>
+          {doubles && p.partner && (
+            <span className="block text-xs">Alcanza con que confirme uno de los dos ({p.partner.nickname} también puede).</span>
+          )}
         </p>
         <ConfirmRejectButtons matchId={match.id} />
       </CardContent>

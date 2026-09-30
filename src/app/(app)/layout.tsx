@@ -2,8 +2,9 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { BlueBootIcon } from "@/components/brand/logo";
 import { DesktopNav, MobileNav } from "@/components/app-nav";
+import { InstallApp } from "@/components/install-app";
 import { UserMenu } from "@/components/user-menu";
-import { getSession } from "@/lib/data";
+import { confirmableBy, getSession } from "@/lib/data";
 import { createClient } from "@/lib/supabase/server";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
@@ -15,7 +16,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const { count } = await supabase
     .from("matches")
     .select("id", { count: "exact", head: true })
-    .eq("opponent_id", user.id)
+    .or(confirmableBy(user.id))
     .eq("status", "pending");
   const pendingCount = count ?? 0;
 
@@ -34,7 +35,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           <UserMenu profile={profile} />
         </div>
       </header>
-      <main className="mx-auto w-full max-w-5xl flex-1 px-4 pt-5 pb-28 md:pb-10">{children}</main>
+      <main className="mx-auto w-full max-w-5xl flex-1 px-4 pt-5 pb-28 md:pb-10">
+        <InstallApp />
+        {children}
+      </main>
       <MobileNav pendingCount={pendingCount} />
     </>
   );

@@ -21,6 +21,15 @@ export const metadata: Metadata = {
   },
   description: "Ranking ELO de ping pong de BlueBoot.",
   applicationName: "Ping Pong BlueBoot",
+  appleWebApp: {
+    capable: true,
+    title: "Ping Pong",
+    statusBarStyle: "default",
+  },
+  icons: {
+    apple: "/icons/apple-touch-icon.png",
+  },
+  formatDetection: { telephone: false },
 };
 
 export const viewport: Viewport = {

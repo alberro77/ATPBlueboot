@@ -22,7 +22,10 @@ export function ProfileForm({ profile }: { profile: Profile }) {
             <div>
               <div className="text-lg font-bold">{profile.nickname}</div>
               <div className="text-sm text-muted-foreground">
-                {profile.elo} ELO · {profile.wins}V / {profile.losses}D
+                1v1: {profile.elo} ELO · {profile.wins}V / {profile.losses}D
+              </div>
+              <div className="text-sm text-muted-foreground">
+                2v2: {profile.elo_doubles} ELO · {profile.doubles_wins}V / {profile.doubles_losses}D
               </div>
             </div>
           </div>
