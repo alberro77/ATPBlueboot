@@ -49,12 +49,7 @@ export async function signUp(_prev: ActionResult | null, formData: FormData): Pr
       },
     },
   });
-  if (error) {
-    if (error.code === "user_already_exists") {
-      return { ok: false, error: "Ya existe una cuenta con ese email. Iniciá sesión." };
-    }
-    return { ok: false, error: error.message };
-  }
+  if (error) return { ok: false, error: signUpErrorMessage(error.code, error.message) };
 
   // Con "Confirm email" desactivado en Supabase la sesión llega inmediatamente.
   if (data.session) redirect("/");
@@ -63,6 +58,27 @@ export async function signUp(_prev: ActionResult | null, formData: FormData): Pr
     ok: true,
     message: "¡Listo! Te enviamos un email para confirmar tu cuenta. Después iniciá sesión.",
   };
+}
+
+function signUpErrorMessage(code: string | undefined, fallback: string) {
+  switch (code) {
+    case "user_already_exists":
+    case "email_exists":
+      return "Ya existe una cuenta con ese email. Iniciá sesión.";
+    case "over_email_send_rate_limit":
+      // Solo ocurre si "Confirm email" está activado en Supabase (ver README).
+      return "No pudimos enviar el email de confirmación (límite de envíos alcanzado). Probá de nuevo en un rato.";
+    case "over_request_rate_limit":
+      return "Demasiados intentos seguidos. Esperá un minuto y volvé a probar.";
+    case "weak_password":
+      return "La contraseña es muy débil. Probá con una más larga.";
+    case "email_address_invalid":
+      return "Ese email no es válido.";
+    case "signup_disabled":
+      return "El registro de cuentas nuevas está deshabilitado.";
+    default:
+      return fallback;
+  }
 }
 
 export async function createProfile(

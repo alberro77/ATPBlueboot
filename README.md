@@ -30,7 +30,11 @@ Todas viven en la base de datos (`supabase/schema.sql`), en funciones `security 
 2. **Authentication → URL Configuration**:
    - *Site URL*: la URL de producción (por ejemplo, `https://atpblueboot.vercel.app`).
    - *Redirect URLs*: `https://<tu-dominio>/auth/callback` y `http://localhost:3000/auth/callback`.
-3. *(Opcional)* **Authentication → Providers → Email**: desactivar *Confirm email* para que los registros entren sin confirmar por mail. Conviene si es una herramienta interna.
+3. **Authentication → Sign In / Providers → Email**: desactivar *Confirm email* y guardar. El servidor de mail que trae Supabase por defecto manda muy pocos emails por hora, y con la confirmación activada los registros fallan con `email rate limit exceeded`. Sin confirmación, el usuario entra apenas se registra.
+   Si alguien se registró antes de este cambio y quedó sin confirmar, ejecutá en el SQL Editor:
+   ```sql
+   update auth.users set email_confirmed_at = now() where email_confirmed_at is null;
+   ```
 
 ### 2. Local
 
