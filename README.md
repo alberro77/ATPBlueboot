@@ -31,6 +31,18 @@ Todas viven en la base de datos (`supabase/schema.sql`), en funciones `security 
 | Días en el #1 | `top_reigns` registra cada período como #1 del ranking oficial; se actualiza al confirmar partidos y al aplicar decay |
 | Recalcular | `select private.recalculate_ratings();` recalcula todos los ELO desde cero repasando los partidos confirmados en el orden en que se jugaron. Se ejecutó automáticamente al pasar de dos rankings a uno |
 
+## Seguridad
+
+- **RLS en todas las tablas**: sin sesión no se puede leer nada; con sesión solo se lee. Partidos, ELO y estadísticas cambian únicamente a través de funciones `security definer` que validan quién llama.
+- **Cupos anti-spam**: cada usuario puede tener hasta 40 partidos pendientes y cargar hasta 60 por hora.
+- **Registro**: tope de 200 cuentas y, opcionalmente, solo emails de dominios permitidos:
+  ```sql
+  insert into private.allowed_email_domains values ('miempresa.com');
+  ```
+- **Fotos**: un único archivo por usuario (`avatars/<user_id>/avatar`, máx. 512 KB) y el perfil solo acepta links a ese archivo.
+- **Headers**: `X-Frame-Options: DENY`, `frame-ancestors 'none'`, `nosniff`, `Referrer-Policy` y `Permissions-Policy`.
+- **Recomendado en los paneles**: Supabase → Authentication → Rate Limits (dejar los valores por defecto o bajarlos) y largo mínimo de contraseña 8; activar 2FA en las cuentas de Supabase, Vercel y GitHub; ante un ataque, Vercel → Firewall → Attack Challenge Mode.
+
 ## Puesta en marcha
 
 ### 1. Supabase

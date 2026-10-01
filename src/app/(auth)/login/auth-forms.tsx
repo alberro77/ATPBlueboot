@@ -48,9 +48,9 @@ export function AuthForms({ linkError }: { linkError: boolean }) {
                   name="password"
                   type="password"
                   required
-                  minLength={6}
+                  minLength={8}
                   autoComplete="new-password"
-                  hint="Mínimo 6 caracteres."
+                  hint="Mínimo 8 caracteres."
                 />
                 <FormMessage state={signupState} />
                 <Button type="submit" size="lg" className="h-10" disabled={signupPending}>

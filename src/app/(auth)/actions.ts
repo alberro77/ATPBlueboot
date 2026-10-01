@@ -26,8 +26,8 @@ export async function signUp(_prev: ActionResult | null, formData: FormData): Pr
   const password = String(formData.get("password") ?? "");
   const parsed = parseProfileForm(formData);
   if (!parsed.ok) return { ok: false, error: parsed.error };
-  if (password.length < 6) {
-    return { ok: false, error: "La contraseña tiene que tener al menos 6 caracteres." };
+  if (password.length < 8) {
+    return { ok: false, error: "La contraseña tiene que tener al menos 8 caracteres." };
   }
 
   const supabase = await createClient();
@@ -77,6 +77,10 @@ function signUpErrorMessage(code: string | undefined, fallback: string) {
     case "signup_disabled":
       return "El registro de cuentas nuevas está deshabilitado.";
     default:
+      // El trigger guard_signup rechaza dominios no permitidos o el tope de cuentas.
+      if (fallback.includes("Database error saving new user")) {
+        return "No se pudo crear la cuenta. Usá tu email de la empresa o consultá con quien administra la app.";
+      }
       return fallback;
   }
 }

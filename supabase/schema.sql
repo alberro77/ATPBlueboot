@@ -28,6 +28,14 @@
 --     Cuenta la fecha en que se jugó el partido, no la de confirmación: si
 --     una confirmación tardía demuestra que el jugador sí jugó, se le
 --     devuelven las semanas cobradas de más.
+--
+-- Seguridad (todo se aplica en la base, aunque alguien use la API directo):
+--   · RLS en todas las tablas; ELO/estadísticas solo cambian vía funciones.
+--   · Registro: tope de cuentas y, opcionalmente, solo emails de dominios
+--     permitidos (tabla private.allowed_email_domains; vacía = cualquiera).
+--   · Cupos de carga por usuario: 40 partidos pendientes y 60 por hora.
+--   · Fotos: un solo archivo por usuario (avatars/<user_id>/avatar) y el
+--     perfil solo acepta links a ese archivo.
 -- =====================================================================
 
 create schema if not exists private;
@@ -68,6 +76,21 @@ create table if not exists public.profiles (
 );
 
 create unique index if not exists profiles_nickname_key on public.profiles (lower(nickname));
+
+-- Sin caracteres de control ni invisibles (evita apodos "clonados" o rotos).
+alter table public.profiles drop constraint if exists profiles_clean_text;
+alter table public.profiles add constraint profiles_clean_text check (
+  first_name !~ '[[:cntrl:]]'
+  and last_name !~ '[[:cntrl:]]'
+  and nickname !~ '[[:cntrl:]\u200B-\u200F\u2028-\u202E\u2060-\u2064\uFEFF]'
+) not valid;
+
+-- La foto solo puede ser el archivo propio del bucket "avatars" del proyecto.
+alter table public.profiles drop constraint if exists profiles_avatar_own_storage;
+alter table public.profiles add constraint profiles_avatar_own_storage check (
+  avatar_url is null
+  or avatar_url ~ ('^https://[a-z0-9-]+\.supabase\.co/storage/v1/object/public/avatars/' || id::text || '/avatar(\?v=[0-9]+)?$')
+) not valid;
 create index if not exists profiles_elo_idx on public.profiles (elo desc);
 
 -- Equipo A = reporter_id (+ reporter_partner_id en 2v2): quien carga el partido.
@@ -206,6 +229,38 @@ begin
 end;
 $$;
 
+-- Dominios de email permitidos para registrarse. Vacía = cualquiera.
+-- Ej.: insert into private.allowed_email_domains values ('miempresa.com');
+create table if not exists private.allowed_email_domains (
+  domain text primary key check (domain = lower(btrim(domain)) and domain <> '')
+);
+
+create or replace function public.guard_signup()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if (select count(*) from auth.users) >= 200 then
+    raise exception 'Se alcanzó el máximo de cuentas de la app.';
+  end if;
+  if exists (select 1 from private.allowed_email_domains)
+     and not exists (
+       select 1 from private.allowed_email_domains
+        where domain = lower(split_part(new.email, '@', 2))
+     ) then
+    raise exception 'Solo se pueden registrar emails de la empresa.';
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists guard_signup on auth.users;
+create trigger guard_signup
+  before insert on auth.users
+  for each row execute function public.guard_signup();
+
 drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created
   after insert on auth.users
@@ -222,6 +277,8 @@ drop function if exists private.settle_doubles(public.matches);
 drop function if exists private.validate_score(integer, integer);
 drop function if exists public.report_match(uuid, integer, integer);
 drop function if exists public.report_doubles_match(uuid, uuid, uuid, integer, integer);
+drop function if exists public.report_match(uuid, boolean);
+drop function if exists public.report_doubles_match(uuid, uuid, uuid, boolean);
 
 -- ---------------------------------------------------------------------
 -- Decay por inactividad
@@ -324,6 +381,9 @@ declare
   v_open_id      bigint;
   v_open_player  uuid;
 begin
+  -- Una sola actualización a la vez (evita choques entre confirmaciones simultáneas).
+  perform pg_advisory_xact_lock(hashtext('pingpong_update_leader'));
+
   select id into v_leader
     from public.profiles
    where matches_played >= 3
@@ -353,107 +413,21 @@ $$;
 -- Carga de partidos (solo ganador / perdedor)
 -- ---------------------------------------------------------------------
 
-create or replace function public.report_match(
-  p_opponent_id uuid,
-  p_i_won       boolean
-)
-returns uuid
+-- Cupos por usuario para frenar el spam de partidos (también vía API directa).
+create or replace function private.check_report_quota(p_reporter uuid, p_new integer)
+returns void
 language plpgsql
 security definer
 set search_path = ''
 as $$
-declare
-  v_me  uuid := auth.uid();
-  v_id  uuid;
 begin
-  if v_me is null then
-    raise exception 'Tenés que iniciar sesión.';
+  if (select count(*) from public.matches where reporter_id = p_reporter and status = 'pending') + p_new > 40 then
+    raise exception 'Tenés demasiados partidos sin confirmar. Esperá a que tus rivales los confirmen.';
   end if;
-  if not exists (select 1 from public.profiles where id = v_me) then
-    raise exception 'Completá tu perfil antes de cargar partidos.';
+  if (select count(*) from public.matches
+       where reporter_id = p_reporter and created_at > now() - interval '1 hour') + p_new > 60 then
+    raise exception 'Cargaste muchos partidos en la última hora. Probá de nuevo más tarde.';
   end if;
-  if p_opponent_id is null or p_opponent_id = v_me then
-    raise exception 'Elegí un rival válido.';
-  end if;
-  if not exists (select 1 from public.profiles where id = p_opponent_id) then
-    raise exception 'El rival no existe.';
-  end if;
-  if p_i_won is null then
-    raise exception 'Indicá quién ganó.';
-  end if;
-
-  if exists (
-    select 1 from public.matches
-     where mode = 'singles'
-       and reporter_id = v_me
-       and opponent_id = p_opponent_id
-       and status = 'pending'
-       and created_at > now() - interval '1 minute'
-  ) then
-    raise exception 'Ya cargaste un partido contra este rival hace instantes.';
-  end if;
-
-  insert into public.matches (mode, reporter_id, opponent_id, reporter_won)
-  values ('singles', v_me, p_opponent_id, p_i_won)
-  returning id into v_id;
-
-  return v_id;
-end;
-$$;
-
-create or replace function public.report_doubles_match(
-  p_partner_id          uuid,
-  p_opponent_id         uuid,
-  p_opponent_partner_id uuid,
-  p_we_won              boolean
-)
-returns uuid
-language plpgsql
-security definer
-set search_path = ''
-as $$
-declare
-  v_me  uuid := auth.uid();
-  v_id  uuid;
-begin
-  if v_me is null then
-    raise exception 'Tenés que iniciar sesión.';
-  end if;
-  if not exists (select 1 from public.profiles where id = v_me) then
-    raise exception 'Completá tu perfil antes de cargar partidos.';
-  end if;
-  if p_partner_id is null or p_opponent_id is null or p_opponent_partner_id is null then
-    raise exception 'Elegí a tu compañero y a los dos rivales.';
-  end if;
-  if (select count(distinct x) from unnest(array[v_me, p_partner_id, p_opponent_id, p_opponent_partner_id]) as x) <> 4 then
-    raise exception 'Los cuatro jugadores tienen que ser distintos.';
-  end if;
-  if (select count(*) from public.profiles where id in (p_partner_id, p_opponent_id, p_opponent_partner_id)) <> 3 then
-    raise exception 'Alguno de los jugadores no existe.';
-  end if;
-  if p_we_won is null then
-    raise exception 'Indicá qué equipo ganó.';
-  end if;
-
-  if exists (
-    select 1 from public.matches
-     where mode = 'doubles'
-       and reporter_id = v_me
-       and status = 'pending'
-       and created_at > now() - interval '1 minute'
-  ) then
-    raise exception 'Ya cargaste un partido de dobles hace instantes.';
-  end if;
-
-  insert into public.matches (
-    mode, reporter_id, reporter_partner_id, opponent_id, opponent_partner_id, reporter_won
-  )
-  values (
-    'doubles', v_me, p_partner_id, p_opponent_id, p_opponent_partner_id, p_we_won
-  )
-  returning id into v_id;
-
-  return v_id;
 end;
 $$;
 
@@ -717,6 +691,8 @@ begin
     raise exception 'Alguno de los jugadores no existe.';
   end if;
 
+  perform private.check_report_quota(v_me, v_n);
+
   -- Evita el doble envío accidental.
   if exists (
     select 1 from public.matches
@@ -940,11 +916,10 @@ create policy elo_events_select on public.elo_events
   for select to authenticated using (true);
 
 revoke execute on function public.handle_new_user() from public, anon, authenticated;
+revoke execute on function public.guard_signup() from public, anon, authenticated;
 revoke execute on all functions in schema private from public, anon, authenticated;
 
 revoke execute on function public.apply_inactivity_decay() from public, anon;
-revoke execute on function public.report_match(uuid, boolean) from public, anon;
-revoke execute on function public.report_doubles_match(uuid, uuid, uuid, boolean) from public, anon;
 revoke execute on function public.confirm_match(uuid) from public, anon;
 revoke execute on function public.reject_match(uuid) from public, anon;
 revoke execute on function public.cancel_match(uuid) from public, anon;
@@ -955,8 +930,6 @@ revoke execute on function public.cancel_batch(uuid) from public, anon;
 revoke execute on function public.is_nickname_available(text) from public;
 
 grant execute on function public.apply_inactivity_decay() to authenticated;
-grant execute on function public.report_match(uuid, boolean) to authenticated;
-grant execute on function public.report_doubles_match(uuid, uuid, uuid, boolean) to authenticated;
 grant execute on function public.confirm_match(uuid) to authenticated;
 grant execute on function public.reject_match(uuid) to authenticated;
 grant execute on function public.cancel_match(uuid) to authenticated;
@@ -970,7 +943,7 @@ grant execute on function public.is_nickname_available(text) to anon, authentica
 -- Fotos de perfil (Supabase Storage)
 -- La app recorta y comprime la foto a 256x256 (~30 KB) antes de subirla;
 -- el bucket además rechaza archivos de más de 512 KB o que no sean imágenes.
--- Cada usuario solo puede escribir en su carpeta: avatars/<user_id>/...
+-- Cada usuario tiene un único archivo: avatars/<user_id>/avatar (no se pueden acumular).
 -- ---------------------------------------------------------------------
 
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
@@ -988,13 +961,13 @@ create policy avatars_select_own on storage.objects
 drop policy if exists avatars_insert_own on storage.objects;
 create policy avatars_insert_own on storage.objects
   for insert to authenticated
-  with check (bucket_id = 'avatars' and (storage.foldername(name))[1] = (select auth.uid())::text);
+  with check (bucket_id = 'avatars' and name = (select auth.uid())::text || '/avatar');
 
 drop policy if exists avatars_update_own on storage.objects;
 create policy avatars_update_own on storage.objects
   for update to authenticated
   using (bucket_id = 'avatars' and (storage.foldername(name))[1] = (select auth.uid())::text)
-  with check (bucket_id = 'avatars' and (storage.foldername(name))[1] = (select auth.uid())::text);
+  with check (bucket_id = 'avatars' and name = (select auth.uid())::text || '/avatar');
 
 drop policy if exists avatars_delete_own on storage.objects;
 create policy avatars_delete_own on storage.objects
