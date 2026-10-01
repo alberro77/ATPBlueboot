@@ -78,7 +78,7 @@ export default async function PlayerPage({ params }: PageProps<"/jugador/[id]">)
   );
 }
 
-/** Cara a cara entre el jugador y vos, más los partidos que jugaron juntos en 2v2. */
+/** Cara a cara 1 vs 1 entre el jugador y vos, más los partidos que jugaron juntos en 2v2. */
 function HeadToHead({ player, me, matches }: { player: Profile; me: Profile; matches: MatchWithPlayers[] }) {
   const meId = me.id;
   let myWins = 0;
@@ -87,7 +87,7 @@ function HeadToHead({ player, me, matches }: { player: Profile; me: Profile; mat
   let togetherWins = 0;
   for (const m of matches) {
     const p = perspective(m, player.id);
-    if (p.rivals.some((r) => r.id === meId)) {
+    if (m.mode === "singles" && p.rivals[0].id === meId) {
       if (p.won) theirWins++;
       else myWins++;
     } else if (p.partner?.id === meId) {
@@ -103,7 +103,7 @@ function HeadToHead({ player, me, matches }: { player: Profile; me: Profile; mat
       <CardContent className="grid gap-3 px-4 py-4">
         <div className="flex items-center justify-between">
           <span className="flex items-center gap-1.5 text-xs font-bold text-muted-foreground uppercase">
-            <Swords className="size-3.5 text-primary" /> Cara a cara
+            <Swords className="size-3.5 text-primary" /> Cara a cara 1 vs 1
           </span>
           <Link
             href={`/cargar?rival=${player.id}`}
@@ -114,7 +114,7 @@ function HeadToHead({ player, me, matches }: { player: Profile; me: Profile; mat
         </div>
         {played === 0 ? (
           <p className="text-center text-sm text-muted-foreground">
-            Todavía no jugaron entre ustedes. ¡Es hora de estrenar la rivalidad!
+            Todavía no jugaron un 1 vs 1 entre ustedes. ¡Es hora de estrenar la rivalidad!
           </p>
         ) : (
           <>
@@ -131,7 +131,7 @@ function HeadToHead({ player, me, matches }: { player: Profile; me: Profile; mat
             </div>
             <RecordBar wins={myWins} losses={theirWins} />
             <p className="text-center text-xs text-muted-foreground">
-              {played} {played === 1 ? "partido" : "partidos"} en contra ·{" "}
+              {played} {played === 1 ? "partido" : "partidos"} 1 vs 1 ·{" "}
               {leader ? `${leader} ${leader === "Vos" ? "vas" : "va"} ganando` : "Empatados"}
             </p>
           </>
