@@ -4,6 +4,7 @@ import { buttonVariants } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { EmptyState, PageHeader } from "@/components/page-header";
 import { PlayerAvatar } from "@/components/player-avatar";
+import { NotificationPrompt } from "@/components/notification-prompt";
 import { MatchesProgress, Podium, RankingTable } from "@/components/ranking-table";
 import { StreakBadge } from "@/components/streak-badge";
 import { getSession } from "@/lib/data";
@@ -47,6 +48,7 @@ export default async function RankingPage() {
     <>
       <PageHeader title={`¡Hola, ${me.nickname}! 👋`} description="Así está la mesa hoy. 1 vs 1 y 2 vs 2 suman al mismo ELO." />
 
+      <NotificationPrompt />
       <MyPositionCard me={me} ranked={ranked} />
       {onFire.length > 0 && <OnFireStrip players={onFire} currentUserId={me.id} />}
       <SeasonLink />
