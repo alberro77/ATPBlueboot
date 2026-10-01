@@ -195,15 +195,14 @@ export function ReportMatchForm({
         </section>
       )}
 
-      {ready && (
+      {/* La probabilidad de ganar se muestra solo en 1 vs 1, con el ELO de cada jugador. */}
+      {ready && !doubles && (
         <WinChance
           className="rounded-2xl border bg-card p-4 shadow-sm"
           title={results.length === 0 ? "Chances de ganar" : "Chances en el próximo"}
           myElo={myElo + afterSoFar}
           rivalElo={rivalElo - afterSoFar}
-          myLabel={doubles ? "Tu equipo" : "Vos"}
-          rivalLabel={rivals.map((p) => p!.nickname).join(" & ")}
-          team={doubles}
+          rivalLabel={rivals[0]!.nickname}
         />
       )}
 

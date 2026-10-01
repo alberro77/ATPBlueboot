@@ -65,7 +65,7 @@ create table if not exists public.profiles (
   id                  uuid primary key references auth.users (id) on delete cascade,
   first_name          text not null check (char_length(btrim(first_name)) between 1 and 50),
   last_name           text not null check (char_length(btrim(last_name)) between 1 and 50),
-  nickname            text not null check (char_length(nickname) between 2 and 20 and nickname = btrim(nickname)),
+  nickname            text not null,
   avatar_url          text check (avatar_url is null or avatar_url ~* '^https?://'),
   elo                 integer not null default 1000,
   matches_played      integer not null default 0,
@@ -80,6 +80,11 @@ create table if not exists public.profiles (
   best_win_streak     integer not null default 0,
   created_at          timestamptz not null default now()
 );
+
+-- Apodo de 2 a 25 caracteres, sin espacios en los extremos (también actualiza bases con el límite anterior de 20).
+alter table public.profiles drop constraint if exists profiles_nickname_check;
+alter table public.profiles add constraint profiles_nickname_check
+  check (char_length(nickname) between 2 and 25 and nickname = btrim(nickname));
 
 create unique index if not exists profiles_nickname_key on public.profiles (lower(nickname));
 

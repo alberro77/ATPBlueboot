@@ -63,7 +63,7 @@ export function ProfileFields({
         name="nickname"
         required
         minLength={2}
-        maxLength={20}
+        maxLength={25}
         autoComplete="nickname"
         placeholder="Ej: El Muro"
         hint="Es como vas a aparecer en el ranking."

@@ -17,8 +17,8 @@ export function parseProfileForm(
 
   if (!first_name || first_name.length > 50) return { ok: false, error: "Ingresá tu nombre." };
   if (!last_name || last_name.length > 50) return { ok: false, error: "Ingresá tu apellido." };
-  if (nickname.length < 2 || nickname.length > 20)
-    return { ok: false, error: "El apodo tiene que tener entre 2 y 20 caracteres." };
+  if (nickname.length < 2 || nickname.length > 25)
+    return { ok: false, error: "El apodo tiene que tener entre 2 y 25 caracteres." };
   // Solo se aceptan fotos subidas a nuestro bucket (ya recortadas y con tamaño limitado).
   if (avatarRaw && !avatarRaw.startsWith(AVATAR_PUBLIC_PREFIX))
     return { ok: false, error: "La foto no es válida. Volvé a subirla." };
