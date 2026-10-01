@@ -46,3 +46,19 @@ export function reignDays(reigns: Reign[]) {
 export function playerHref(playerId: string, viewerId: string) {
   return playerId === viewerId ? "/perfil" : `/jugador/${playerId}`;
 }
+
+const shortDateFormatter = new Intl.DateTimeFormat("es-AR", {
+  day: "numeric",
+  month: "short",
+  timeZone: TIME_ZONE,
+});
+
+/** "12 sept" */
+export function formatShortDate(iso: string | number) {
+  return shortDateFormatter.format(new Date(iso));
+}
+
+/** Momento actual en ms (para pasarlo desde el servidor a componentes que no pueden llamar a Date.now al renderizar). */
+export function nowMs() {
+  return Date.now();
+}

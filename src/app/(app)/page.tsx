@@ -44,7 +44,7 @@ export default async function RankingPage() {
 
   return (
     <>
-      <PageHeader title="Ranking" description="1 vs 1 y 2 vs 2 suman al mismo ELO." />
+      <PageHeader title={`¡Hola, ${me.nickname}! 👋`} description="Así está la mesa hoy. 1 vs 1 y 2 vs 2 suman al mismo ELO." />
 
       <MyPositionCard me={me} ranked={ranked} />
       {onFire.length > 0 && <OnFireStrip players={onFire} currentUserId={me.id} />}

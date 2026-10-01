@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { Crown, Medal } from "lucide-react";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { PlayerAvatar } from "@/components/player-avatar";
 import { StreakBadge } from "@/components/streak-badge";
 import { fullName, playerHref } from "@/lib/format";
@@ -87,66 +86,59 @@ export function RankingTable({
   startIndex?: number;
 }) {
   return (
-    <div className="overflow-hidden rounded-2xl border bg-card shadow-sm">
-      <Table>
-        <TableHeader>
-          <TableRow className="bg-muted/60 hover:bg-muted/60">
-            <TableHead className="w-12 text-center">#</TableHead>
-            <TableHead>Jugador</TableHead>
-            <TableHead className="hidden text-center sm:table-cell">PJ</TableHead>
-            <TableHead className="text-center">V/D</TableHead>
-            <TableHead className="pr-4 text-right">ELO</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {players.map((p, i) => {
-            const position = startIndex + i + 1;
-            const isMe = p.id === currentUserId;
-            return (
-              <TableRow key={p.id} className={cn(isMe && "bg-accent/70 hover:bg-accent")}>
-                <TableCell className="text-center">
-                  {ranked ? (
-                    position <= 3 ? (
-                      <Medal className={cn("mx-auto size-5", ["text-amber-500", "text-slate-400", "text-orange-400"][position - 1])} />
-                    ) : (
-                      <span className="text-sm font-bold text-muted-foreground tabular-nums">{position}</span>
-                    )
+    <ol className="grid gap-2">
+      {players.map((p, i) => {
+        const position = startIndex + i + 1;
+        const isMe = p.id === currentUserId;
+        return (
+          <li key={p.id}>
+            <Link
+              href={playerHref(p.id, currentUserId)}
+              className={cn(
+                "flex items-center gap-3 rounded-2xl border bg-card p-3 shadow-sm shadow-primary/5 transition-all hover:border-primary/40 hover:shadow-md active:scale-[0.99]",
+                isMe && "border-primary/50 bg-accent/50",
+              )}
+            >
+              <span className="flex w-7 shrink-0 justify-center">
+                {ranked ? (
+                  position <= 3 ? (
+                    <Medal className={cn("size-5", ["text-amber-500", "text-slate-400", "text-orange-400"][position - 1])} />
                   ) : (
-                    <span className="text-muted-foreground">–</span>
+                    <span className="text-sm font-bold text-muted-foreground tabular-nums">{position}</span>
+                  )
+                ) : (
+                  <span className="text-muted-foreground">–</span>
+                )}
+              </span>
+              <PlayerAvatar player={p} size={44} />
+              <div className="min-w-0 flex-1">
+                <div className="flex min-w-0 items-center gap-1.5">
+                  <span className="truncate font-bold">{p.nickname}</span>
+                  {isMe && (
+                    <span className="shrink-0 rounded-full bg-primary px-1.5 py-0.5 text-[0.6rem] leading-none font-bold text-primary-foreground uppercase">
+                      Vos
+                    </span>
                   )}
-                </TableCell>
-                <TableCell>
-                  <Link href={playerHref(p.id, currentUserId)} className="flex min-w-0 items-center gap-3">
-                    <PlayerAvatar player={p} />
-                    <div className="min-w-0">
-                      <div className="flex min-w-0 items-center gap-1.5 font-semibold">
-                        <span className="truncate">{p.nickname}</span>
-                        {isMe && <span className="shrink-0 text-xs font-normal text-primary">(vos)</span>}
-                        <StreakBadge streak={p.win_streak} />
-                      </div>
-                      <div className="truncate text-xs text-muted-foreground">
-                        {fullName(p)}
-                        <span className="sm:hidden"> · {p.matches_played} PJ</span>
-                      </div>
-                      {!ranked && <MatchesProgress played={p.matches_played} className="mt-1 sm:hidden" />}
-                    </div>
-                  </Link>
-                </TableCell>
-                <TableCell className="hidden text-center tabular-nums sm:table-cell">
-                  {ranked ? p.matches_played : <MatchesProgress played={p.matches_played} />}
-                </TableCell>
-                <TableCell className="text-center tabular-nums">
-                  <span className="font-semibold text-success">{p.wins}</span>
-                  <span className="text-muted-foreground">/</span>
-                  <span className="font-semibold text-destructive">{p.losses}</span>
-                </TableCell>
-                <TableCell className="pr-4 text-right text-base font-extrabold tabular-nums">{p.elo}</TableCell>
-              </TableRow>
-            );
-          })}
-        </TableBody>
-      </Table>
-    </div>
+                  <StreakBadge streak={p.win_streak} />
+                </div>
+                <div className="truncate text-xs text-muted-foreground">
+                  {fullName(p)} · {p.matches_played} PJ
+                </div>
+                {!ranked && <MatchesProgress played={p.matches_played} className="mt-1" />}
+              </div>
+              <div className="shrink-0 text-right">
+                <div className="text-lg leading-tight font-extrabold tabular-nums">{p.elo}</div>
+                <div className="text-[0.7rem] font-semibold tabular-nums">
+                  <span className="text-success">{p.wins}G</span>
+                  <span className="text-muted-foreground"> · </span>
+                  <span className="text-destructive">{p.losses}P</span>
+                </div>
+              </div>
+            </Link>
+          </li>
+        );
+      })}
+    </ol>
   );
 }
 

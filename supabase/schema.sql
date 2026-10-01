@@ -933,9 +933,11 @@ drop policy if exists top_reigns_select on public.top_reigns;
 create policy top_reigns_select on public.top_reigns
   for select to authenticated using (true);
 
+-- El historial de ELO es visible para todos (gráfico de evolución en los perfiles).
 drop policy if exists elo_events_select_own on public.elo_events;
-create policy elo_events_select_own on public.elo_events
-  for select to authenticated using (profile_id = (select auth.uid()));
+drop policy if exists elo_events_select on public.elo_events;
+create policy elo_events_select on public.elo_events
+  for select to authenticated using (true);
 
 revoke execute on function public.handle_new_user() from public, anon, authenticated;
 revoke execute on all functions in schema private from public, anon, authenticated;

@@ -7,8 +7,11 @@ import { Card, CardContent } from "@/components/ui/card";
 import { EmptyState, SectionTitle } from "@/components/page-header";
 import { MyMatchRow, perspective } from "@/components/match-views";
 import { computeRelations, RecordBar, RelationCards, StatsCard } from "@/components/player-stats";
+import { EloChart } from "@/components/elo-chart";
 import { ProfileHero } from "@/components/profile-hero";
+import { WinChance } from "@/components/win-chance";
 import { getSession } from "@/lib/data";
+import { nowMs } from "@/lib/format";
 import { loadProfileData } from "@/lib/profile-data";
 import { createClient } from "@/lib/supabase/server";
 import type { MatchWithPlayers, Profile } from "@/lib/types";
@@ -48,8 +51,9 @@ export default async function PlayerPage({ params }: PageProps<"/jugador/[id]">)
         <ChevronLeft className="size-4" /> Ranking
       </Link>
       <ProfileHero profile={player} isMe={false} {...data} />
-      <HeadToHead player={player} meId={me.id} matches={data.matches} />
+      <HeadToHead player={player} me={me} matches={data.matches} />
       <StatsCard profile={player} matches={data.matches} />
+      <EloChart points={data.eloHistory} nowMs={nowMs()} />
       <RelationCards
         rival={rival}
         partner={partner}
@@ -75,7 +79,8 @@ export default async function PlayerPage({ params }: PageProps<"/jugador/[id]">)
 }
 
 /** Cara a cara entre el jugador y vos, más los partidos que jugaron juntos en 2v2. */
-function HeadToHead({ player, meId, matches }: { player: Profile; meId: string; matches: MatchWithPlayers[] }) {
+function HeadToHead({ player, me, matches }: { player: Profile; me: Profile; matches: MatchWithPlayers[] }) {
+  const meId = me.id;
   let myWins = 0;
   let theirWins = 0;
   let together = 0;
@@ -131,6 +136,13 @@ function HeadToHead({ player, meId, matches }: { player: Profile; meId: string; 
             </p>
           </>
         )}
+        <WinChance
+          className="border-t pt-3"
+          title="Si juegan hoy"
+          myElo={me.elo}
+          rivalElo={player.elo}
+          rivalLabel={player.nickname}
+        />
         {together > 0 && (
           <p className="rounded-xl bg-muted/60 px-3 py-2 text-center text-xs text-muted-foreground">
             Juntos en 2 vs 2: <b className="text-foreground">{together}</b> {together === 1 ? "partido" : "partidos"} ·{" "}

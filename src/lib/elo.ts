@@ -36,3 +36,8 @@ export function seriesDelta(myElo: number, rivalElo: number, results: boolean[])
   }
   return total;
 }
+
+/** Probabilidad (0–1) de que gane quien tiene `myElo` (en 2v2, promedio del equipo). */
+export function winProbability(myElo: number, rivalElo: number) {
+  return expectedScore(myElo, rivalElo);
+}

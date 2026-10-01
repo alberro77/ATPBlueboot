@@ -8,6 +8,7 @@ import { EmptyState } from "@/components/page-header";
 import { PlayerAvatar } from "@/components/player-avatar";
 import { PlayerSheet } from "@/components/player-picker";
 import { SegmentedButtons } from "@/components/segmented";
+import { WinChance } from "@/components/win-chance";
 import { reportSeries } from "@/app/actions";
 import { eloDelta, seriesDelta, teamElo } from "@/lib/elo";
 import type { Mode, PlayerSummary } from "@/lib/types";
@@ -192,6 +193,18 @@ export function ReportMatchForm({
             </button>
           </div>
         </section>
+      )}
+
+      {ready && (
+        <WinChance
+          className="rounded-2xl border bg-card p-4 shadow-sm"
+          title={results.length === 0 ? "Chances de ganar" : "Chances en el próximo"}
+          myElo={myElo + afterSoFar}
+          rivalElo={rivalElo - afterSoFar}
+          myLabel={doubles ? "Tu equipo" : "Vos"}
+          rivalLabel={rivals.map((p) => p!.nickname).join(" & ")}
+          team={doubles}
+        />
       )}
 
       {/* Resultados: un toque por partido, en el orden en que se jugaron. */}
