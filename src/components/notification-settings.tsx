@@ -72,6 +72,8 @@ export function NotificationSettings({
 
   function enable() {
     startBusy(async () => {
+      // Se anota en qué paso falla para poder mostrar la causa real.
+      let step = "pedir permiso";
       try {
         const result = await Notification.requestPermission();
         rerender((n) => n + 1);
@@ -79,24 +81,34 @@ export function NotificationSettings({
           toast.error("Para recibir avisos tenés que permitir las notificaciones en tu navegador.");
           return;
         }
+        step = "registrar el servicio en segundo plano";
         const reg = await navigator.serviceWorker.register("/sw.js");
         await navigator.serviceWorker.ready;
+
+        step = "conectar con el servicio de notificaciones del navegador";
         const sub =
           (await reg.pushManager.getSubscription()) ??
           (await reg.pushManager.subscribe({
             userVisibleOnly: true,
             applicationServerKey: urlBase64ToUint8Array(PUBLIC_KEY!),
           }));
+
+        step = "guardar este dispositivo";
         const json = sub.toJSON();
         const saved = await savePushSubscription({ endpoint: json.endpoint ?? "", keys: json.keys });
         if (!saved.ok) {
-          toast.error(saved.error);
+          toast.error("No se pudo guardar este dispositivo.", { description: saved.error });
           return;
         }
         setSubscribed(true);
         toast.success("¡Listo! Vas a recibir avisos en este dispositivo.");
-      } catch {
-        toast.error("No se pudieron activar las notificaciones en este dispositivo.");
+      } catch (e) {
+        const err = e as { name?: string; message?: string };
+        console.error("Notificaciones: falló al " + step, e);
+        toast.error("No se pudieron activar las notificaciones.", {
+          description: `Falló al ${step}: ${err.name ?? "Error"}${err.message ? " — " + err.message : ""}`,
+          duration: 15000,
+        });
       }
     });
   }
