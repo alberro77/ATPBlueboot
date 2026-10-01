@@ -10,6 +10,7 @@ Ranking ELO de ping pong de BlueBoot. Mobile-first, hecho con Next.js 16 (App Ro
 - **Perfil**: tu ELO, posición y **días en el #1**, estadísticas (jugados, ganados, perdidos, efectividad, últimos 5, racha actual y mejor racha), **gráfico de evolución del ELO** (1 mes / 3 meses / todo, con detalle de cada cambio al tocar), **clásico rival** (con quien más jugaste 1 vs 1) y **compañero** (con quien más jugaste juntos en 2 vs 2). Datos y foto editables.
 - **Perfil de otros jugadores** (`/jugador/[id]`): se abre tocando a cualquiera en el ranking, el podio, la franja On fire o las tarjetas de rival/compañero. Muestra lo mismo que el tuyo, su gráfico de ELO, el **cara a cara 1 vs 1 con vos** con la **probabilidad de ganar si juegan hoy** (y los partidos que jugaron juntos en 2v2), sus últimos partidos y un botón **Desafiar** que abre la carga con ese rival elegido.
 - **Historial**: todos los partidos confirmados de la empresa, con filtro 1v1 / 2v2, paginados.
+- **Temporadas mensuales** (`/temporadas`): cada mes es una temporada y el ELO **no** se resetea. Campeón = quien más ELO suma en el mes (mín. 3 partidos); además #1 al cierre, más activo, mejor racha, la gran sorpresa (victoria con menos chances), rivalidad 1v1 y dupla del mes, tabla del mes y tu resumen personal. Al empezar un mes nuevo aparece un resumen de la temporada que terminó (una vez por dispositivo). Queda el registro de todas las temporadas.
 - **App instalable (PWA)**: desde el celular se puede agregar a la pantalla de inicio y abre a pantalla completa. En Android/Chrome aparece un botón "Instalar"; en iPhone, la app muestra cómo hacerlo (Compartir → Agregar a inicio).
 - **Fotos**: se recortan en cuadrado y se comprimen a 256×256 WebP (~30 KB) en el navegador antes de subirse a Supabase Storage; el bucket rechaza archivos de más de 512 KB o que no sean imágenes.
 
@@ -29,6 +30,7 @@ Todas viven en la base de datos (`supabase/schema.sql`), en funciones `security 
 | Series | `report_series()` carga hasta 20 partidos seguidos entre los mismos jugadores (comparten `batch_id`, en el orden en que se jugaron); `confirm_batch()` / `reject_batch()` / `cancel_batch()` los resuelven juntos |
 | Rachas | `win_streak` (victorias seguidas actuales) y `best_win_streak`. Un partido confirmado tarde y anterior al último no corta ni alarga la racha |
 | Días en el #1 | `top_reigns` registra cada período como #1 del ranking oficial; se actualiza al confirmar partidos y al aplicar decay |
+| Temporadas | Mes calendario en hora de Argentina. `season_elo(inicio, fin)` devuelve el ELO de cada jugador al inicio y al cierre; el resumen se calcula a partir de los partidos confirmados, así que siempre coincide con los datos |
 | Recalcular | `select private.recalculate_ratings();` recalcula todos los ELO desde cero repasando los partidos confirmados en el orden en que se jugaron. Se ejecutó automáticamente al pasar de dos rankings a uno |
 
 ## Seguridad

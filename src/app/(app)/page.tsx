@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Flame, Info, Plus, Swords, Users } from "lucide-react";
+import { ChevronRight, Flame, Info, Plus, Swords, Trophy, Users } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { EmptyState, PageHeader } from "@/components/page-header";
@@ -9,7 +9,8 @@ import { StreakBadge } from "@/components/streak-badge";
 import { getSession } from "@/lib/data";
 import { MIN_MATCHES_TO_RANK, ON_FIRE_STREAK } from "@/lib/elo";
 import { createClient } from "@/lib/supabase/server";
-import { playerHref, reignDays, type Reign } from "@/lib/format";
+import { nowMs, playerHref, reignDays, type Reign } from "@/lib/format";
+import { seasonKeyAt, seasonMonthName } from "@/lib/seasons";
 import type { Profile } from "@/lib/types";
 
 export default async function RankingPage() {
@@ -48,6 +49,7 @@ export default async function RankingPage() {
 
       <MyPositionCard me={me} ranked={ranked} />
       {onFire.length > 0 && <OnFireStrip players={onFire} currentUserId={me.id} />}
+      <SeasonLink />
 
       <Tabs defaultValue="oficial">
         <TabsList className="h-10 w-full sm:w-auto">
@@ -164,5 +166,25 @@ function OnFireStrip({ players, currentUserId }: { players: Profile[]; currentUs
         ))}
       </ul>
     </section>
+  );
+}
+
+/** Acceso a la temporada (mes) en curso. */
+function SeasonLink() {
+  const key = seasonKeyAt(nowMs());
+  return (
+    <Link
+      href={`/temporadas/${key}`}
+      className="mb-5 flex items-center gap-3 rounded-2xl border bg-card p-3 shadow-sm transition-all hover:border-primary/40 active:scale-[0.99]"
+    >
+      <span className="flex size-10 items-center justify-center rounded-xl bg-amber-100 text-amber-600 dark:bg-amber-400/15 dark:text-amber-300">
+        <Trophy className="size-5" />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block text-sm font-bold">Temporada de {seasonMonthName(key)}</span>
+        <span className="block text-xs text-muted-foreground">¿Quién suma más ELO este mes? Mirá la tabla.</span>
+      </span>
+      <ChevronRight className="size-5 text-muted-foreground" />
+    </Link>
   );
 }

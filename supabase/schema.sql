@@ -20,6 +20,9 @@
 --   · Clasificado = 3 o más partidos confirmados (1v1 y 2v2 suman).
 --   · Días en el top 1: top_reigns guarda cada período como #1 del ranking
 --     oficial (se actualiza al confirmar partidos y al aplicar decay).
+--   · Temporadas: cada mes calendario (hora de Argentina) es una temporada.
+--     El ELO NO se resetea; season_elo() da el ELO de cada jugador al inicio
+--     y al cierre del mes y la app arma el resumen (campeón = más ELO ganado).
 --   · Racha: victorias seguidas actuales (win_streak) y la mejor histórica
 --     (best_win_streak). Un partido confirmado tarde que es anterior al
 --     último registrado no corta ni alarga la racha actual.
@@ -805,6 +808,31 @@ begin
 end;
 $$;
 
+-- ---------------------------------------------------------------------
+-- Temporadas: ELO de cada jugador al inicio y al cierre de un período, y
+-- cuántos partidos confirmados tenía al cierre (para saber si clasificaba).
+-- ---------------------------------------------------------------------
+
+create or replace function public.season_elo(p_start timestamptz, p_end timestamptz)
+returns table (profile_id uuid, elo_start integer, elo_end integer, matches_before_end integer)
+language sql
+stable
+security invoker
+set search_path = ''
+as $$
+  select
+    p.id,
+    coalesce((select e.elo_after from public.elo_events e
+               where e.profile_id = p.id and e.created_at < p_start
+               order by e.created_at desc, e.id desc limit 1), 1000),
+    coalesce((select e.elo_after from public.elo_events e
+               where e.profile_id = p.id and e.created_at < p_end
+               order by e.created_at desc, e.id desc limit 1), 1000),
+    (select count(*)::integer from public.elo_events e
+      where e.profile_id = p.id and e.kind = 'match' and e.created_at < p_end)
+  from public.profiles p;
+$$;
+
 create or replace function public.is_nickname_available(p_nickname text)
 returns boolean
 language sql
@@ -928,6 +956,7 @@ revoke execute on function public.confirm_batch(uuid) from public, anon;
 revoke execute on function public.reject_batch(uuid) from public, anon;
 revoke execute on function public.cancel_batch(uuid) from public, anon;
 revoke execute on function public.is_nickname_available(text) from public;
+revoke execute on function public.season_elo(timestamptz, timestamptz) from public, anon;
 
 grant execute on function public.apply_inactivity_decay() to authenticated;
 grant execute on function public.confirm_match(uuid) to authenticated;
@@ -938,6 +967,7 @@ grant execute on function public.confirm_batch(uuid) to authenticated;
 grant execute on function public.reject_batch(uuid) to authenticated;
 grant execute on function public.cancel_batch(uuid) to authenticated;
 grant execute on function public.is_nickname_available(text) to anon, authenticated;
+grant execute on function public.season_elo(timestamptz, timestamptz) to authenticated;
 
 -- ---------------------------------------------------------------------
 -- Fotos de perfil (Supabase Storage)

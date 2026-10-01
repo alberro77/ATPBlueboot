@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { LogOut, UserRound } from "lucide-react";
+import { LogOut, Trophy, UserRound } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -41,6 +41,10 @@ export function UserMenu({ profile }: { profile: Profile }) {
         <DropdownMenuItem render={<Link href="/perfil" />}>
           <UserRound />
           Mi perfil
+        </DropdownMenuItem>
+        <DropdownMenuItem render={<Link href="/temporadas" />}>
+          <Trophy />
+          Temporadas
         </DropdownMenuItem>
         <DropdownMenuItem variant="destructive" onClick={() => signOut()}>
           <LogOut />

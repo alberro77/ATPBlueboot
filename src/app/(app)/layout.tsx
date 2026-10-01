@@ -1,10 +1,15 @@
 import Link from "next/link";
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { BlueBootIcon } from "@/components/brand/logo";
 import { DesktopNav, MobileNav } from "@/components/app-nav";
 import { InstallApp } from "@/components/install-app";
+import { SeasonRecap } from "@/components/season-recap";
 import { UserMenu } from "@/components/user-menu";
 import { confirmableBy, getSession } from "@/lib/data";
+import { nowMs } from "@/lib/format";
+import { loadSeason } from "@/lib/season-data";
+import { SEASON_SEEN_COOKIE, seasonKeyAt, shiftSeason } from "@/lib/seasons";
 import { createClient } from "@/lib/supabase/server";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
@@ -19,6 +24,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     .or(confirmableBy(user.id))
     .eq("status", "pending");
   const pendingCount = count ?? 0;
+
+  // Resumen de la temporada que terminó: se muestra una vez por dispositivo.
+  const lastSeason = shiftSeason(seasonKeyAt(nowMs()), -1);
+  const seen = (await cookies()).get(SEASON_SEEN_COOKIE)?.value;
+  const recap = seen === lastSeason ? null : await loadSeason(supabase, lastSeason);
 
   return (
     <>
@@ -40,6 +50,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         {children}
       </main>
       <MobileNav pendingCount={pendingCount} />
+      {recap && recap.totalMatches > 0 && <SeasonRecap summary={recap} viewerId={user.id} />}
     </>
   );
 }
