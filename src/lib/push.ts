@@ -16,9 +16,11 @@ export type PushPayload = {
   tag: string;
 };
 
-const PUBLIC_KEY = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
-const PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY;
-const SUBJECT = process.env.VAPID_SUBJECT ?? "mailto:admin@example.com";
+// Se limpian espacios, saltos de línea y comillas que se cuelan al pegar las variables en Vercel.
+const clean = (v?: string) => v?.trim().replace(/^["']+|["']+$/g, "").trim();
+const PUBLIC_KEY = clean(process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY);
+const PRIVATE_KEY = clean(process.env.VAPID_PRIVATE_KEY);
+const SUBJECT = clean(process.env.VAPID_SUBJECT) ?? "mailto:admin@example.com";
 
 /** Las notificaciones solo funcionan si el servidor tiene las claves VAPID. */
 export const pushConfigured = Boolean(PUBLIC_KEY && PRIVATE_KEY);

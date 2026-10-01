@@ -12,7 +12,8 @@ import {
 } from "@/app/actions";
 import { cn } from "@/lib/utils";
 
-const PUBLIC_KEY = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+// Se limpian espacios, saltos de línea y comillas que se cuelan al pegar la variable en Vercel.
+const PUBLIC_KEY = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY?.trim().replace(/^["']+|["']+$/g, "").trim();
 const noopSubscribe = () => () => {};
 
 function urlBase64ToUint8Array(base64: string) {
@@ -85,12 +86,22 @@ export function NotificationSettings({
         const reg = await navigator.serviceWorker.register("/sw.js");
         await navigator.serviceWorker.ready;
 
+        step = "leer la clave de notificaciones de la app";
+        const serverKey = urlBase64ToUint8Array(PUBLIC_KEY!);
+        if (serverKey.length !== 65) {
+          throw new Error(
+            "La clave NEXT_PUBLIC_VAPID_PUBLIC_KEY cargada en Vercel no es válida (tiene " +
+              serverKey.length +
+              " bytes y debería tener 65). Revisá que sea la clave pública, completa y sin espacios.",
+          );
+        }
+
         step = "conectar con el servicio de notificaciones del navegador";
         const sub =
           (await reg.pushManager.getSubscription()) ??
           (await reg.pushManager.subscribe({
             userVisibleOnly: true,
-            applicationServerKey: urlBase64ToUint8Array(PUBLIC_KEY!),
+            applicationServerKey: serverKey,
           }));
 
         step = "guardar este dispositivo";
