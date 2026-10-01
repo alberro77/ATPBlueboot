@@ -5,6 +5,7 @@ import { BlueBootIcon } from "@/components/brand/logo";
 import { DesktopNav, MobileNav } from "@/components/app-nav";
 import { InstallApp } from "@/components/install-app";
 import { SeasonRecap } from "@/components/season-recap";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { UserMenu } from "@/components/user-menu";
 import { confirmableBy, getSession } from "@/lib/data";
 import { nowMs } from "@/lib/format";
@@ -42,7 +43,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             </span>
           </Link>
           <DesktopNav pendingCount={pendingCount} />
-          <UserMenu profile={profile} />
+          <div className="flex items-center gap-2">
+            <ThemeToggle />
+            <UserMenu profile={profile} />
+          </div>
         </div>
       </header>
       <main className="mx-auto w-full max-w-5xl flex-1 px-4 pt-5 pb-28 md:pb-10">
