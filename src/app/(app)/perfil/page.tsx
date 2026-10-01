@@ -26,7 +26,7 @@ export default async function ProfilePage() {
       <ProfileHero profile={me} isMe {...data} />
       <StatsCard profile={me} matches={data.matches} />
       <ModeStatsCards matches={data.matches} playerId={me.id} />
-      <EloChart points={data.eloHistory} nowMs={nowMs()} title="Tu ELO en el tiempo" />
+      <EloChart points={data.eloHistory} nowMs={nowMs()} title="Tu AURA en el tiempo" />
       <RelationCards rival={rival} partner={partner} viewerId={me.id} />
       <NotificationSettings
         initialPrefs={{

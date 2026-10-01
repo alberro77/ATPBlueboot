@@ -6,7 +6,7 @@ import { formatShortDate, signed } from "@/lib/format";
 import type { Mode } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
-/** Un cambio de ELO: partido (1v1/2v2) o penalización por inactividad. */
+/** Un cambio de AURA: partido (1v1/2v2) o penalización por inactividad. */
 export type EloPoint = {
   t: string;
   elo: number;
@@ -42,7 +42,7 @@ function niceTicks(min: number, max: number) {
   return { lo, hi, ticks };
 }
 
-export function EloChart({ points, nowMs, title = "Evolución del ELO" }: { points: EloPoint[]; nowMs: number; title?: string }) {
+export function EloChart({ points, nowMs, title = "Evolución del AURA" }: { points: EloPoint[]; nowMs: number; title?: string }) {
   const [range, setRange] = useState<RangeKey>("all");
   const [width, setWidth] = useState(0);
   const [active, setActive] = useState<number | null>(null);
@@ -73,7 +73,7 @@ export function EloChart({ points, nowMs, title = "Evolución del ELO" }: { poin
           <TrendingUp className="size-4 text-primary" /> {title}
         </h2>
         <div className="rounded-2xl border border-dashed border-primary/25 bg-card/60 px-6 py-8 text-center text-sm text-muted-foreground">
-          Cuando haya partidos confirmados, acá vas a ver cómo sube (o baja) el ELO. 📈
+          Cuando haya partidos confirmados, acá vas a ver cómo sube (o baja) el AURA. 📈
         </div>
       </section>
     );
@@ -239,7 +239,7 @@ export function EloChart({ points, nowMs, title = "Evolución del ELO" }: { poin
                 <th className="py-1 text-left font-medium">Fecha</th>
                 <th className="py-1 text-left font-medium">Motivo</th>
                 <th className="py-1 text-right font-medium">Cambio</th>
-                <th className="py-1 text-right font-medium">ELO</th>
+                <th className="py-1 text-right font-medium">AURA</th>
               </tr>
             </thead>
             <tbody>

@@ -41,7 +41,7 @@ export function ModeBadge({ mode }: { mode: Mode }) {
   );
 }
 
-/** Pastilla con el ELO ganado (verde) o perdido (rojo). */
+/** Pastilla con el AURA ganada (verde) o perdido (rojo). */
 export function DeltaPill({ delta, suffix }: { delta: number; suffix?: string }) {
   return (
     <span
@@ -74,7 +74,7 @@ function legacyScore(m: MatchWithPlayers, teamAFirst: boolean) {
   return teamAFirst ? `${m.reporter_score}-${m.opponent_score}` : `${m.opponent_score}-${m.reporter_score}`;
 }
 
-/** Un partido visto desde un jugador: su equipo, los rivales, el resultado y el ELO ganado/perdido. */
+/** Un partido visto desde un jugador: su equipo, los rivales, el resultado y el AURA ganada/perdida. */
 export function perspective(match: MatchWithPlayers, playerId: string) {
   const onTeamA = match.reporter_id === playerId || match.reporter_partner_id === playerId;
   const won = onTeamA === match.reporter_won;

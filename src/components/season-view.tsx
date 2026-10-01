@@ -21,7 +21,7 @@ function ChangePill({ change, className }: { change: number; className?: string 
         className,
       )}
     >
-      {change === 0 ? "±0" : signed(change)} ELO
+      {change === 0 ? "±0" : signed(change)} AURA
     </span>
   );
 }
@@ -52,13 +52,13 @@ function Stat({ value, label }: { value: number; label: string }) {
   );
 }
 
-/** Top 3 de la temporada por ELO ganado (solo con 3+ partidos en el mes). */
+/** Top 3 de la temporada por AURA ganada (solo con 3+ partidos en el mes). */
 export function SeasonPodium({ summary, viewerId }: { summary: SeasonSummary; viewerId: string }) {
   const qualified = summary.standings.filter((p) => p.games >= MIN_MATCHES_TO_RANK).slice(0, 3);
   if (qualified.length === 0) {
     return (
       <p className="rounded-2xl border border-dashed border-primary/25 bg-card/60 p-5 text-center text-sm text-muted-foreground">
-        Todavía nadie jugó {MIN_MATCHES_TO_RANK} partidos este mes. El campeón es quien más ELO gane con al menos{" "}
+        Todavía nadie jugó {MIN_MATCHES_TO_RANK} partidos este mes. El campeón es quien más AURA gane con al menos{" "}
         {MIN_MATCHES_TO_RANK} partidos.
       </p>
     );
@@ -94,7 +94,7 @@ export function SeasonPodium({ summary, viewerId }: { summary: SeasonSummary; vi
         )}
       </div>
       <p className="text-center text-xs text-muted-foreground">
-        Gana quien más ELO suma en el mes (mínimo {MIN_MATCHES_TO_RANK} partidos). El ELO no se resetea.
+        Gana quien más AURA suma en el mes (mínimo {MIN_MATCHES_TO_RANK} partidos). El AURA no se resetea.
       </p>
     </section>
   );
@@ -147,7 +147,7 @@ export function SeasonHighlights({ summary, viewerId }: { summary: SeasonSummary
       <div className="grid grid-cols-2 gap-2">
         {topAtClose && (
           <Highlight icon={Crown} tone="bg-amber-100 text-amber-600 dark:bg-amber-400/15 dark:text-amber-300" title="#1 al cierre">
-            <PlayerLine player={topAtClose.player} viewerId={viewerId} detail={`${topAtClose.elo} ELO`} />
+            <PlayerLine player={topAtClose.player} viewerId={viewerId} detail={`${topAtClose.elo} AURA`} />
           </Highlight>
         )}
         {mostActive && (
@@ -241,7 +241,7 @@ export function MySeason({ summary, viewerId }: { summary: SeasonSummary; viewer
   );
 }
 
-/** Tabla del mes ordenada por ELO ganado. */
+/** Tabla del mes ordenada por AURA ganada. */
 export function SeasonTable({ summary, viewerId }: { summary: SeasonSummary; viewerId: string }) {
   if (summary.standings.length === 0) return null;
   return (

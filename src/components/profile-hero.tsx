@@ -4,7 +4,7 @@ import { StreakBadge } from "@/components/streak-badge";
 import { fullName } from "@/lib/format";
 import type { Profile } from "@/lib/types";
 
-/** Cabecera azul del perfil: foto, nombre, ELO, posición y días en el #1. */
+/** Cabecera azul del perfil: foto, nombre, AURA, posición y días en el #1. */
 export function ProfileHero({
   profile,
   position,
@@ -31,7 +31,7 @@ export function ProfileHero({
         <p className="text-sm text-white/75">{fullName(profile)}</p>
       </div>
       <div className="mt-1 flex items-center gap-5">
-        <Metric value={String(profile.elo)} label="ELO" />
+        <Metric value={String(profile.elo)} label="AURA" />
         <Divider />
         <Metric
           value={position > 0 ? `#${position}` : "–"}

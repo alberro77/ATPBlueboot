@@ -174,7 +174,7 @@ export default async function MyMatchesPage() {
               </Link>
             }
           >
-            Jugá un partido y cargalo: tu historial y tu ELO aparecen acá.
+            Jugá un partido y cargalo: tu historial y tu AURA aparecen acá.
           </EmptyState>
         ) : (
           <ul className="divide-y overflow-hidden rounded-2xl border bg-card shadow-sm">
@@ -283,7 +283,7 @@ function IncomingCard({ group, me }: { group: PendingGroup; me: Profile }) {
 
         <p className="text-center text-sm">
           ¿Es correcto? Si confirmás:{" "}
-          <DeltaPill delta={preview} suffix={doubles ? " ELO c/u" : " ELO"} />
+          <DeltaPill delta={preview} suffix={doubles ? " AURA c/u" : " AURA"} />
           {series && <span className="block text-xs text-muted-foreground">(estimado para la serie completa)</span>}
         </p>
         {doubles && p.partner && (

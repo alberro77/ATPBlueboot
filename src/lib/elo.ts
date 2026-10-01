@@ -16,14 +16,14 @@ export function eloDelta(winnerElo: number, loserElo: number) {
   return Math.max(1, Math.round(K_FACTOR * (1 - expectedScore(winnerElo, loserElo))));
 }
 
-/** ELO de un equipo: promedio de sus integrantes (en 1v1, el del jugador). */
+/** AURA de un equipo: promedio de sus integrantes (en 1v1, el del jugador). */
 export function teamElo(players: { elo: number }[]) {
   return players.reduce((sum, p) => sum + p.elo, 0) / players.length;
 }
 
 /**
  * Simula una serie de partidos en orden (true = ganó mi equipo) y devuelve el
- * ELO total que gana (+) o pierde (−) mi equipo. Sirve de estimación: el cálculo
+ * AURA total que gana (+) o pierde (−) mi equipo. Sirve de estimación: el cálculo
  * real lo hace la base al confirmar.
  */
 export function seriesDelta(myElo: number, rivalElo: number, results: boolean[]) {

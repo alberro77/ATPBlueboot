@@ -102,7 +102,7 @@ export async function confirmMatch(matchId: string): Promise<ActionResult> {
   const supabase = await createClient();
   const { data: delta, error } = await supabase.rpc("confirm_match", { p_match_id: matchId });
   if (error) return { ok: false, error: error.message };
-  return done(`Partido confirmado. Se transfirieron ${delta} puntos ELO.`);
+  return done(`Partido confirmado. Se transfirieron ${delta} puntos de AURA.`);
 }
 
 export async function rejectMatch(matchId: string): Promise<ActionResult> {

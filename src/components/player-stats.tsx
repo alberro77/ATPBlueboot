@@ -217,7 +217,7 @@ export type ModeRecord = {
   bestStreak: number;
   /** Últimos 5 resultados, del más nuevo al más viejo (true = victoria). */
   last: boolean[];
-  /** ELO neto ganado (+) o perdido (−) en partidos de esta modalidad. */
+  /** AURA neta ganada (+) o perdida (−) en partidos de esta modalidad. */
   eloChange: number;
 };
 
@@ -288,7 +288,7 @@ function ModeCard({ mode, record: r }: { mode: Mode; record: ModeRecord }) {
                     : "bg-muted text-muted-foreground",
               )}
             >
-              {r.eloChange === 0 ? "±0" : signed(r.eloChange)} ELO
+              {r.eloChange === 0 ? "±0" : signed(r.eloChange)} AURA
             </span>
           )}
         </div>

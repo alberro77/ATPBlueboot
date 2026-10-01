@@ -4,8 +4,8 @@ import type { MatchWithPlayers, PlayerSummary } from "@/lib/types";
 
 /*
  * Temporadas: cada mes calendario (hora de Argentina, UTC-3 sin horario de
- * verano) es una temporada. El ELO no se resetea: se mide cuánto ganó o perdió
- * cada jugador en el mes. Campeón = más ELO ganado con al menos 3 partidos.
+ * verano) es una temporada. El AURA no se resetea: se mide cuánto ganó o perdió
+ * cada jugador en el mes. Campeón = más AURA ganada con al menos 3 partidos.
  */
 
 /** Cookie con la última temporada cuyo resumen ya se vio en este dispositivo. */
@@ -84,13 +84,13 @@ export type SeasonSummary = {
   totalMatches: number;
   doublesMatches: number;
   standings: SeasonPlayer[];
-  /** Más ELO ganado en el mes (con al menos 3 partidos). */
+  /** Más AURA ganada en el mes (con al menos 3 partidos). */
   champion: SeasonPlayer | null;
   /** #1 del ranking oficial al cierre del mes. */
   topAtClose: { player: PlayerSummary; elo: number } | null;
   mostActive: SeasonPlayer | null;
   bestStreak: SeasonPlayer | null;
-  /** Victoria con menos probabilidad (según el ELO previo). */
+  /** Victoria con menos probabilidad (según el AURA previa). */
   upset: { winners: PlayerSummary[]; losers: PlayerSummary[]; chance: number; date: string } | null;
   /** Par con más partidos 1 vs 1 entre sí. */
   rivalry: Pair | null;
@@ -153,12 +153,12 @@ export function computeSeason(
   const top = <T,>(list: T[], score: (x: T) => number, min = 1) =>
     list.reduce<T | null>((best, x) => (score(x) >= min && (!best || score(x) > score(best)) ? x : best), null);
 
-  // #1 al cierre: mayor ELO entre los que tenían 3+ partidos confirmados.
+  // #1 al cierre: mayor AURA entre los que tenían 3+ partidos confirmados.
   const closing = elo
     .filter((e) => e.matches_before_end >= MIN_MATCHES_TO_RANK && byId.has(e.profile_id))
     .sort((a, b) => b.elo_end - a.elo_end)[0];
 
-  // Mayor sorpresa: el ganador con menos chances según el ELO previo del partido.
+  // Mayor sorpresa: el ganador con menos chances según el AURA previa del partido.
   let upset: SeasonSummary["upset"] = null;
   for (const m of sorted) {
     if (m.reporter_elo_before === null || m.opponent_elo_before === null) continue;

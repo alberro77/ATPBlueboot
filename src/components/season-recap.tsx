@@ -63,7 +63,7 @@ export function SeasonRecap({ summary, viewerId }: { summary: SeasonSummary; vie
               </div>
               <p className="text-lg font-extrabold">{champ.player.id === viewerId ? "¡Sos el campeón!" : champ.player.nickname}</p>
               <p className="rounded-full bg-white/20 px-2.5 py-0.5 text-xs font-bold">
-                Campeón del mes · {signed(champ.change)} ELO
+                Campeón del mes · {signed(champ.change)} AURA
               </p>
             </div>
           ) : (
@@ -77,7 +77,7 @@ export function SeasonRecap({ summary, viewerId }: { summary: SeasonSummary; vie
               <>
                 Terminaste <b>#{myIndex + 1}</b> · {me.games} partidos ·{" "}
                 <b className={cn(me.change > 0 ? "text-success" : me.change < 0 ? "text-destructive" : "")}>
-                  {me.change === 0 ? "±0" : signed(me.change)} ELO
+                  {me.change === 0 ? "±0" : signed(me.change)} AURA
                 </b>
               </>
             ) : (

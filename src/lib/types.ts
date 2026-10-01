@@ -6,7 +6,7 @@ export type Profile = {
   last_name: string;
   nickname: string;
   avatar_url: string | null;
-  /** ELO único: suman los partidos de 1v1 y de 2v2. */
+  /** AURA única: suman los partidos de 1v1 y de 2v2. */
   elo: number;
   matches_played: number;
   wins: number;

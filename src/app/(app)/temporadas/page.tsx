@@ -28,7 +28,7 @@ export default async function SeasonsPage() {
     <div className="mx-auto grid max-w-lg gap-5">
       <PageHeader
         title="Temporadas"
-        description="Cada mes es una temporada. El ELO sigue de largo; el campeón es quien más ELO suma en el mes."
+        description="Cada mes es una temporada. El AURA sigue de largo; el campeón es quien más AURA suma en el mes."
       />
 
       <Link prefetch={false}
@@ -49,7 +49,7 @@ export default async function SeasonsPage() {
               <p className="truncate font-bold">{live.champion.player.nickname}</p>
             </div>
             <span className="rounded-full bg-white px-2.5 py-1 text-xs font-bold text-primary tabular-nums">
-              {signed(live.champion.change)} ELO
+              {signed(live.champion.change)} AURA
             </span>
           </div>
         ) : (

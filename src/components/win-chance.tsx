@@ -3,7 +3,7 @@ import { winProbability } from "@/lib/elo";
 import { cn } from "@/lib/utils";
 
 /**
- * Probabilidad de ganar según el ELO (la misma fórmula del ranking).
+ * Probabilidad de ganar según el AURA (la misma fórmula del ranking).
  * Barra partida: tu lado en azul, el rival en gris, con el % de cada uno.
  */
 export function WinChance({

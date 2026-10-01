@@ -46,7 +46,7 @@ export default async function RankingPage() {
 
   return (
     <>
-      <PageHeader title={`¡Hola, ${me.nickname}! 👋`} description="Así está la mesa hoy. 1 vs 1 y 2 vs 2 suman al mismo ELO." />
+      <PageHeader title={`¡Hola, ${me.nickname}! 👋`} description="Así está la mesa hoy. 1 vs 1 y 2 vs 2 suman la misma AURA." />
 
       <NotificationPrompt />
       <MyPositionCard me={me} ranked={ranked} />
@@ -134,7 +134,7 @@ function MyPositionCard({ me, ranked }: { me: Profile; ranked: Profile[] }) {
         )}
       </div>
       <div className="text-right">
-        <p className="text-xs font-medium text-white/75">ELO</p>
+        <p className="text-xs font-medium text-white/75">AURA</p>
         <p className="text-2xl leading-tight font-extrabold tabular-nums">{me.elo}</p>
       </div>
     </Link>
@@ -184,7 +184,7 @@ function SeasonLink() {
       </span>
       <span className="min-w-0 flex-1">
         <span className="block text-sm font-bold">Temporada de {seasonMonthName(key)}</span>
-        <span className="block text-xs text-muted-foreground">¿Quién suma más ELO este mes? Mirá la tabla.</span>
+        <span className="block text-xs text-muted-foreground">¿Quién suma más AURA este mes? Mirá la tabla.</span>
       </span>
       <ChevronRight className="size-5 text-muted-foreground" />
     </Link>

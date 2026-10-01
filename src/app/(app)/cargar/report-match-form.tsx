@@ -195,7 +195,7 @@ export function ReportMatchForm({
         </section>
       )}
 
-      {/* La probabilidad de ganar se muestra solo en 1 vs 1, con el ELO de cada jugador. */}
+      {/* La probabilidad de ganar se muestra solo en 1 vs 1, con el AURA de cada jugador. */}
       {ready && !doubles && (
         <WinChance
           className="rounded-2xl border bg-card p-4 shadow-sm"
@@ -368,7 +368,7 @@ function ResultButton({
       {points !== null && (
         <span className="rounded-full bg-white/20 px-2.5 py-0.5 text-xs font-bold tabular-nums">
           {won ? "+" : "−"}
-          {points} ELO
+          {points} AURA
         </span>
       )}
     </button>
@@ -407,7 +407,7 @@ function SeriesSummary({
           )}
         >
           ≈ {total >= 0 ? "+" : "−"}
-          {Math.abs(total)} ELO
+          {Math.abs(total)} AURA
         </span>
       </div>
       <ol className="flex flex-wrap gap-x-2 gap-y-5 pb-3" aria-label="Resultados en orden">

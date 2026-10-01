@@ -40,7 +40,7 @@ export async function loadProfileData(supabase: Supabase, playerId: string) {
   };
 }
 
-/** Serie del gráfico: arranca en el ELO previo al primer cambio y sigue cada evento. */
+/** Serie del gráfico: arranca en el AURA previa al primer cambio y sigue cada evento. */
 function toEloPoints(events: EloEvent[]): EloPoint[] {
   if (events.length === 0) return [];
   const first = events[0];
