@@ -2,14 +2,14 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2, Plus, ThumbsDown, Trophy, UsersRound } from "lucide-react";
+import { Loader2, Plus, Send, ThumbsDown, Trophy, UsersRound, X } from "lucide-react";
 import { toast } from "sonner";
 import { EmptyState } from "@/components/page-header";
 import { PlayerAvatar } from "@/components/player-avatar";
 import { PlayerSheet } from "@/components/player-picker";
 import { SegmentedButtons } from "@/components/segmented";
-import { reportDoublesMatch, reportMatch } from "@/app/actions";
-import { eloDelta, teamElo } from "@/lib/elo";
+import { reportSeries } from "@/app/actions";
+import { eloDelta, seriesDelta, teamElo } from "@/lib/elo";
 import type { Mode, PlayerSummary } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -20,6 +20,8 @@ const SLOT_LABEL: Record<SlotKey, string> = {
   rival1: "Rival",
   rival2: "Rival",
 };
+
+const MAX_SERIES = 20;
 
 const SHEET_TITLE: Record<SlotKey, string> = {
   partner: "¿Con quién jugaste?",
@@ -32,17 +34,24 @@ export function ReportMatchForm({
   players,
   recentIds,
   initialMode,
+  initialRivalId = null,
 }: {
   me: PlayerSummary;
   players: PlayerSummary[];
   recentIds: string[];
   initialMode: Mode;
+  /** Rival preseleccionado (botón "Desafiar" del perfil). */
+  initialRivalId?: string | null;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
-  const [sending, setSending] = useState<"won" | "lost" | null>(null);
+  const [results, setResults] = useState<boolean[]>([]);
   const [mode, setMode] = useState<Mode>(initialMode);
-  const [slots, setSlots] = useState<Record<SlotKey, string | null>>({ partner: null, rival1: null, rival2: null });
+  const [slots, setSlots] = useState<Record<SlotKey, string | null>>(() => ({
+    partner: null,
+    rival1: players.some((p) => p.id === initialRivalId) ? initialRivalId : null,
+    rival2: null,
+  }));
   const [sheetSlot, setSheetSlot] = useState<SlotKey | null>(null);
 
   const doubles = mode === "doubles";
@@ -67,8 +76,13 @@ export function ReportMatchForm({
   const rivals = (doubles ? [slots.rival1, slots.rival2] : [slots.rival1]).map(byId);
   const ready = order.every((k) => slots[k]);
   const myTeam = doubles ? [me, partner] : [me];
-  const gain = ready ? eloDelta(teamElo(myTeam as PlayerSummary[]), teamElo(rivals as PlayerSummary[])) : null;
-  const loss = ready ? eloDelta(teamElo(rivals as PlayerSummary[]), teamElo(myTeam as PlayerSummary[])) : null;
+  const myElo = ready ? teamElo(myTeam as PlayerSummary[]) : 0;
+  const rivalElo = ready ? teamElo(rivals as PlayerSummary[]) : 0;
+  // Lo que se gana / pierde en el próximo partido de la serie.
+  const afterSoFar = seriesDelta(myElo, rivalElo, results);
+  const gain = ready ? eloDelta(myElo + afterSoFar, rivalElo - afterSoFar) : null;
+  const loss = ready ? eloDelta(rivalElo - afterSoFar, myElo + afterSoFar) : null;
+  const wins = results.filter(Boolean).length;
 
   const taken = new Set(order.map((k) => slots[k]).filter(Boolean));
   const availableFor = (slot: SlotKey) => players.filter((p) => p.id === slots[slot] || !taken.has(p.id));
@@ -85,24 +99,29 @@ export function ReportMatchForm({
     if (next === "singles") setSlots((s) => ({ partner: null, rival1: s.rival1, rival2: null }));
   }
 
-  function submit(won: boolean) {
-    if (!ready || pending) return;
-    setSending(won ? "won" : "lost");
+  function addResult(won: boolean) {
+    if (!ready || results.length >= MAX_SERIES) return;
+    setResults((r) => [...r, won]);
+    navigator.vibrate?.(15);
+  }
+
+  function submit() {
+    if (!ready || pending || results.length === 0) return;
     startTransition(async () => {
-      const result = doubles
-        ? await reportDoublesMatch({
-            partnerId: slots.partner!,
-            opponentId: slots.rival1!,
-            opponentPartnerId: slots.rival2!,
-            weWon: won,
-          })
-        : await reportMatch({ opponentId: slots.rival1!, iWon: won });
+      const result = await reportSeries({
+        mode,
+        partnerId: doubles ? slots.partner : null,
+        opponentId: slots.rival1!,
+        opponentPartnerId: doubles ? slots.rival2 : null,
+        results,
+      });
       if (result.ok) {
-        toast.success(won ? "¡Bien ahí! 🏆" : "¡La próxima es tuya! 💪", { description: result.message });
+        const title =
+          wins * 2 > results.length ? "¡Bien ahí! 🏆" : wins * 2 === results.length ? "¡Parejo! 🤝" : "¡La próxima es tuya! 💪";
+        toast.success(title, { description: result.message });
         router.push("/mis-partidos");
       } else {
         toast.error(result.error);
-        setSending(null);
       }
     });
   }
@@ -175,31 +194,56 @@ export function ReportMatchForm({
         </section>
       )}
 
-      {/* Resultado: tocar envía. */}
+      {/* Resultados: un toque por partido, en el orden en que se jugaron. */}
       <section className={cn("grid gap-3 transition-opacity", !ready && "opacity-50")}>
-        <p className="text-center text-base font-bold">{ready ? "¿Cómo salió?" : "Completá los jugadores"}</p>
+        <div className="text-center">
+          <p className="text-base font-bold">
+            {!ready ? "Completá los jugadores" : results.length === 0 ? "¿Cómo salió?" : "¿Jugaron otro?"}
+          </p>
+          {ready && <p className="text-xs text-muted-foreground">Tocá una vez por cada partido, en orden.</p>}
+        </div>
         <div className="grid grid-cols-2 gap-3">
           <ResultButton
             variant="won"
             label={doubles ? "Ganamos" : "Gané"}
             points={gain}
-            disabled={!ready || pending}
-            loading={sending === "won"}
-            onClick={() => submit(true)}
+            disabled={!ready || pending || results.length >= MAX_SERIES}
+            onClick={() => addResult(true)}
           />
           <ResultButton
             variant="lost"
             label={doubles ? "Perdimos" : "Perdí"}
             points={loss}
-            disabled={!ready || pending}
-            loading={sending === "lost"}
-            onClick={() => submit(false)}
+            disabled={!ready || pending || results.length >= MAX_SERIES}
+            onClick={() => addResult(false)}
           />
         </div>
-        <p className="text-center text-xs text-muted-foreground">
-          {doubles ? "Uno de los rivales" : "Tu rival"} lo confirma y recién ahí suma al ranking.
-        </p>
       </section>
+
+      {results.length > 0 && (
+        <SeriesSummary
+          results={results}
+          total={afterSoFar}
+          onRemove={(i) => setResults((r) => r.filter((_, j) => j !== i))}
+          onClear={() => setResults([])}
+        />
+      )}
+
+      <div className="sticky bottom-24 z-30 md:bottom-4">
+        <button
+          type="button"
+          onClick={submit}
+          disabled={!ready || pending || results.length === 0}
+          className="bg-brand flex h-14 w-full items-center justify-center gap-2 rounded-2xl text-lg font-bold text-white shadow-xl shadow-primary/30 transition-all active:scale-[0.98] disabled:opacity-40 disabled:shadow-none"
+        >
+          {pending ? <Loader2 className="size-5 animate-spin" /> : <Send className="size-5" />}
+          {results.length <= 1 ? "Enviar resultado" : `Enviar ${results.length} partidos`}
+        </button>
+        <p className="mt-2 text-center text-xs text-muted-foreground">
+          {doubles ? "Uno de los rivales" : "Tu rival"} {results.length > 1 ? "los confirma todos juntos" : "lo confirma"} y
+          recién ahí suma al ranking.
+        </p>
+      </div>
 
       {sheetSlot && (
         <PlayerSheet
@@ -285,14 +329,12 @@ function ResultButton({
   label,
   points,
   disabled,
-  loading,
   onClick,
 }: {
   variant: "won" | "lost";
   label: string;
   points: number | null;
   disabled: boolean;
-  loading: boolean;
   onClick: () => void;
 }) {
   const won = variant === "won";
@@ -309,7 +351,7 @@ function ResultButton({
           : "bg-linear-to-br from-slate-500 to-slate-600 shadow-slate-500/25 focus-visible:ring-slate-500/40",
       )}
     >
-      {loading ? <Loader2 className="size-7 animate-spin" /> : <Icon className="size-7" />}
+      <Icon className="size-7" />
       <span className="text-xl font-extrabold">{label}</span>
       {points !== null && (
         <span className="rounded-full bg-white/20 px-2.5 py-0.5 text-xs font-bold tabular-nums">
@@ -318,5 +360,72 @@ function ResultButton({
         </span>
       )}
     </button>
+  );
+}
+
+function SeriesSummary({
+  results,
+  total,
+  onRemove,
+  onClear,
+}: {
+  results: boolean[];
+  total: number;
+  onRemove: (index: number) => void;
+  onClear: () => void;
+}) {
+  const wins = results.filter(Boolean).length;
+  return (
+    <section className="grid gap-3 rounded-2xl border bg-card p-4 shadow-sm">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-sm">
+          <b>{results.length === 1 ? "1 partido" : `${results.length} partidos`}</b>
+          <span className="text-muted-foreground">
+            {" "}
+            · <span className="font-semibold text-success">{wins} {wins === 1 ? "ganado" : "ganados"}</span> ·{" "}
+            <span className="font-semibold text-destructive">
+              {results.length - wins} {results.length - wins === 1 ? "perdido" : "perdidos"}
+            </span>
+          </span>
+        </p>
+        <span
+          className={cn(
+            "shrink-0 rounded-full px-2 py-0.5 text-xs font-bold tabular-nums",
+            total >= 0 ? "bg-success/15 text-success" : "bg-destructive/10 text-destructive",
+          )}
+        >
+          ≈ {total >= 0 ? "+" : "−"}
+          {Math.abs(total)} ELO
+        </span>
+      </div>
+      <ol className="flex flex-wrap gap-x-2 gap-y-5 pb-3" aria-label="Resultados en orden">
+        {results.map((won, i) => (
+          <li key={i}>
+            <button
+              type="button"
+              onClick={() => onRemove(i)}
+              aria-label={`Quitar partido ${i + 1} (${won ? "ganado" : "perdido"})`}
+              className={cn(
+                "relative flex size-10 items-center justify-center rounded-xl text-sm font-extrabold text-white transition-transform active:scale-90",
+                won ? "bg-emerald-500" : "bg-slate-500",
+              )}
+            >
+              {won ? "G" : "P"}
+              <span className="absolute -top-1.5 -right-1.5 flex size-4 items-center justify-center rounded-full bg-card text-foreground shadow ring-1 ring-border">
+                <X className="size-2.5" />
+              </span>
+              <span className="absolute -bottom-4 text-[0.6rem] font-medium text-muted-foreground">{i + 1}</span>
+            </button>
+          </li>
+        ))}
+      </ol>
+      <button
+        type="button"
+        onClick={onClear}
+        className="justify-self-start text-xs font-medium text-muted-foreground hover:text-foreground"
+      >
+        Borrar todo
+      </button>
+    </section>
   );
 }

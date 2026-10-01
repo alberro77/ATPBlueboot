@@ -12,6 +12,9 @@ export type Profile = {
   wins: number;
   losses: number;
   last_match_at: string | null;
+  /** Victorias seguidas actuales y mejor racha histórica. */
+  win_streak: number;
+  best_win_streak: number;
   created_at: string;
 };
 
@@ -43,6 +46,8 @@ export type Match = {
   opponent_partner_elo_before: number | null;
   elo_delta: number | null;
   confirmed_by: string | null;
+  /** Serie de partidos cargados juntos (se confirman de una vez). */
+  batch_id: string | null;
   created_at: string;
   resolved_at: string | null;
 };

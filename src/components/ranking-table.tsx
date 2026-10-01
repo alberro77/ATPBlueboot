@@ -1,7 +1,9 @@
+import Link from "next/link";
 import { Crown, Medal } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { PlayerAvatar } from "@/components/player-avatar";
-import { fullName } from "@/lib/format";
+import { StreakBadge } from "@/components/streak-badge";
+import { fullName, playerHref } from "@/lib/format";
 import { MIN_MATCHES_TO_RANK } from "@/lib/elo";
 import type { Profile } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -13,7 +15,16 @@ const MEDAL = [
 ];
 
 /** Top 3 en formato podio: 2º · 1º · 3º. */
-export function Podium({ players, currentUserId }: { players: Profile[]; currentUserId: string }) {
+export function Podium({
+  players,
+  currentUserId,
+  leaderDays = null,
+}: {
+  players: Profile[];
+  currentUserId: string;
+  /** Días que lleva el #1 en la cima (null si no hay registro). */
+  leaderDays?: number | null;
+}) {
   const slots = [1, 0, 2].map((i) => ({ index: i, player: players[i] }));
   return (
     <div className="mb-4 grid grid-cols-3 items-end gap-2 rounded-2xl border bg-card px-2 pt-5 shadow-sm">
@@ -21,7 +32,11 @@ export function Podium({ players, currentUserId }: { players: Profile[]; current
         if (!player) return <div key={index} />;
         const medal = MEDAL[index];
         return (
-          <div key={player.id} className="flex min-w-0 flex-col items-center text-center">
+          <Link
+            key={player.id}
+            href={playerHref(player.id, currentUserId)}
+            className="flex min-w-0 flex-col items-center text-center transition-transform active:scale-[0.97]"
+          >
             {index === 0 && <Crown className="mb-1 size-6 fill-amber-400 text-amber-500" />}
             <div className="relative">
               <PlayerAvatar
@@ -37,6 +52,7 @@ export function Podium({ players, currentUserId }: { players: Profile[]; current
               >
                 {index + 1}
               </span>
+              <StreakBadge streak={player.win_streak} className="absolute -top-1 -right-3 ring-2 ring-card" />
             </div>
             <div className="mt-3 w-full truncate px-1 text-sm font-bold">
               {player.nickname}
@@ -46,8 +62,13 @@ export function Podium({ players, currentUserId }: { players: Profile[]; current
             <div className="text-[0.7rem] text-muted-foreground tabular-nums">
               {player.wins}V · {player.losses}D
             </div>
+            {index === 0 && leaderDays !== null && (
+              <div className="mt-1 rounded-full bg-amber-100 px-2 py-0.5 text-[0.65rem] font-bold text-amber-700 dark:bg-amber-400/15 dark:text-amber-300">
+                {leaderDays < 1 ? "👑 Nuevo #1" : `👑 ${leaderDays} ${leaderDays === 1 ? "día" : "días"} en la cima`}
+              </div>
+            )}
             <div className={cn("mt-2 w-full rounded-t-xl bg-linear-to-b", medal.block)} />
-          </div>
+          </Link>
         );
       })}
     </div>
@@ -95,12 +116,13 @@ export function RankingTable({
                   )}
                 </TableCell>
                 <TableCell>
-                  <div className="flex min-w-0 items-center gap-3">
+                  <Link href={playerHref(p.id, currentUserId)} className="flex min-w-0 items-center gap-3">
                     <PlayerAvatar player={p} />
                     <div className="min-w-0">
-                      <div className="truncate font-semibold">
-                        {p.nickname}
-                        {isMe && <span className="ml-1.5 text-xs font-normal text-primary">(vos)</span>}
+                      <div className="flex min-w-0 items-center gap-1.5 font-semibold">
+                        <span className="truncate">{p.nickname}</span>
+                        {isMe && <span className="shrink-0 text-xs font-normal text-primary">(vos)</span>}
+                        <StreakBadge streak={p.win_streak} />
                       </div>
                       <div className="truncate text-xs text-muted-foreground">
                         {fullName(p)}
@@ -108,7 +130,7 @@ export function RankingTable({
                       </div>
                       {!ranked && <MatchesProgress played={p.matches_played} className="mt-1 sm:hidden" />}
                     </div>
-                  </div>
+                  </Link>
                 </TableCell>
                 <TableCell className="hidden text-center tabular-nums sm:table-cell">
                   {ranked ? p.matches_played : <MatchesProgress played={p.matches_played} />}

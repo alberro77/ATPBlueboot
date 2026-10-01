@@ -29,3 +29,20 @@ export function signed(n: number) {
 export function daysAgoIso(days: number) {
   return new Date(Date.now() - days * 86_400_000).toISOString();
 }
+
+export type Reign = { started_at: string; ended_at: string | null };
+
+/** Días completos acumulados como #1 (el reinado abierto cuenta hasta ahora). */
+export function reignDays(reigns: Reign[]) {
+  const now = Date.now();
+  const ms = reigns.reduce(
+    (sum, r) => sum + ((r.ended_at ? Date.parse(r.ended_at) : now) - Date.parse(r.started_at)),
+    0,
+  );
+  return Math.floor(ms / 86_400_000);
+}
+
+/** Link al perfil de un jugador (el propio va a /perfil). */
+export function playerHref(playerId: string, viewerId: string) {
+  return playerId === viewerId ? "/perfil" : `/jugador/${playerId}`;
+}

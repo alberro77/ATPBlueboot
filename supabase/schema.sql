@@ -13,9 +13,16 @@
 --     equipo, así que ganar con él da menos puntos (nadie sube "colgado").
 --   · Suma cero: lo que gana un equipo es exactamente lo que pierde el otro.
 --   · Ganar siempre suma al menos 1 punto (aunque la diferencia sea enorme).
+--   · Series: se pueden cargar varios partidos seguidos entre los mismos
+--     jugadores (report_series) y el rival los confirma todos juntos.
 --   · Solo se carga quién ganó. El partido queda 'pending' hasta que el rival
 --     (en 2v2: cualquiera de los dos rivales) lo confirma.
 --   · Clasificado = 3 o más partidos confirmados (1v1 y 2v2 suman).
+--   · Días en el top 1: top_reigns guarda cada período como #1 del ranking
+--     oficial (se actualiza al confirmar partidos y al aplicar decay).
+--   · Racha: victorias seguidas actuales (win_streak) y la mejor histórica
+--     (best_win_streak). Un partido confirmado tarde que es anterior al
+--     último registrado no corta ni alarga la racha actual.
 --   · Decay: un jugador clasificado pierde 10 puntos por cada semana sin
 --     jugar a partir de los 7 días (7 días: -10; 14: -20 acumulado; etc.).
 --     Cuenta la fecha en que se jugó el partido, no la de confirmación: si
@@ -54,6 +61,9 @@ create table if not exists public.profiles (
   last_match_at       timestamptz,
   -- Semanas de inactividad ya penalizadas desde last_match_at (hace el decay idempotente).
   decay_weeks_applied integer not null default 0,
+  -- Victorias seguidas actuales y mejor racha histórica.
+  win_streak          integer not null default 0,
+  best_win_streak     integer not null default 0,
   created_at          timestamptz not null default now()
 );
 
@@ -113,7 +123,11 @@ alter table public.matches
   add column if not exists opponent_partner_id         uuid references public.profiles (id) on delete cascade,
   add column if not exists reporter_partner_elo_before integer,
   add column if not exists opponent_partner_elo_before integer,
-  add column if not exists confirmed_by                uuid references public.profiles (id) on delete set null;
+  add column if not exists confirmed_by                uuid references public.profiles (id) on delete set null,
+  -- Partidos cargados juntos como serie (se confirman de una vez).
+  add column if not exists batch_id                    uuid;
+
+create index if not exists matches_batch_idx on public.matches (batch_id) where batch_id is not null;
 
 alter table public.matches drop constraint if exists matches_mode_players;
 alter table public.matches add constraint matches_mode_players check (
@@ -150,6 +164,18 @@ alter table public.elo_events alter column mode drop not null;
 alter table public.elo_events alter column mode drop default;
 
 create index if not exists elo_events_profile_idx on public.elo_events (profile_id, created_at desc);
+
+-- Cada período en que un jugador fue #1 del ranking oficial (ended_at null = reinado actual).
+create table if not exists public.top_reigns (
+  id          bigint generated always as identity primary key,
+  profile_id  uuid not null references public.profiles (id) on delete cascade,
+  started_at  timestamptz not null,
+  ended_at    timestamptz,
+  constraint top_reigns_valid_range check (ended_at is null or ended_at >= started_at)
+);
+
+create unique index if not exists top_reigns_single_open on public.top_reigns ((true)) where ended_at is null;
+create index if not exists top_reigns_profile_idx on public.top_reigns (profile_id);
 
 -- ---------------------------------------------------------------------
 -- Alta automática de perfil al registrarse
@@ -274,7 +300,52 @@ begin
       v_count := v_count + 1;
     end if;
   end loop;
+  if v_count > 0 then
+    perform private.update_leader(now());
+  end if;
   return v_count;
+end;
+$$;
+
+-- ---------------------------------------------------------------------
+-- Días en el top 1: historial de "reinados" del #1 del ranking oficial.
+-- ---------------------------------------------------------------------
+
+-- Deja registrado quién es el #1 a la fecha p_at: si cambió, cierra el
+-- reinado abierto y abre uno nuevo. Mismo orden que el ranking de la app.
+create or replace function private.update_leader(p_at timestamptz)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_leader       uuid;
+  v_open_id      bigint;
+  v_open_player  uuid;
+begin
+  select id into v_leader
+    from public.profiles
+   where matches_played >= 3
+   order by elo desc, wins desc, nickname
+   limit 1;
+
+  select id, profile_id into v_open_id, v_open_player
+    from public.top_reigns
+   where ended_at is null
+   for update;
+
+  if v_open_id is not null and v_open_player is not distinct from v_leader then
+    return;
+  end if;
+
+  if v_open_id is not null then
+    update public.top_reigns set ended_at = greatest(p_at, started_at) where id = v_open_id;
+  end if;
+
+  if v_leader is not null then
+    insert into public.top_reigns (profile_id, started_at) values (v_leader, p_at);
+  end if;
 end;
 $$;
 
@@ -448,11 +519,22 @@ begin
    where m.id = p_match.id;
 
   -- Mismo +Δ / -Δ para cada integrante. Todas las expresiones ven los valores previos.
+  -- La racha solo se actualiza si el partido es el más reciente del jugador.
   update public.profiles
      set elo = elo + case when id = any (v_winners) then v_delta else -v_delta end,
          matches_played = matches_played + 1,
          wins   = wins   + case when id = any (v_winners) then 1 else 0 end,
          losses = losses + case when id = any (v_winners) then 0 else 1 end,
+         win_streak = case
+                        when last_match_at is not null and v_as_of < last_match_at then win_streak
+                        when id = any (v_winners) then win_streak + 1
+                        else 0
+                      end,
+         best_win_streak = case
+                             when (last_match_at is null or v_as_of >= last_match_at) and id = any (v_winners)
+                             then greatest(best_win_streak, win_streak + 1)
+                             else best_win_streak
+                           end,
          decay_weeks_applied = case when last_match_at is null or v_as_of > last_match_at
                                     then 0 else decay_weeks_applied end,
          last_match_at = greatest(coalesce(last_match_at, v_as_of), v_as_of)
@@ -482,14 +564,16 @@ declare
 begin
   update public.profiles
      set elo = 1000, matches_played = 0, wins = 0, losses = 0,
-         last_match_at = null, decay_weeks_applied = 0
+         last_match_at = null, decay_weeks_applied = 0, win_streak = 0, best_win_streak = 0
    where true;
   delete from public.elo_events where true;
+  delete from public.top_reigns where true;
 
   for v_match in
     select * from public.matches where status = 'confirmed' order by created_at, id
   loop
     perform private.settle_match(v_match);
+    perform private.update_leader(v_match.created_at);
   end loop;
 
   perform public.apply_inactivity_decay();
@@ -525,6 +609,7 @@ begin
   end if;
 
   v_delta := private.settle_match(v_match);
+  perform private.update_leader(now());
 
   update public.matches
      set status = 'confirmed', resolved_at = now(), confirmed_by = v_me
@@ -570,6 +655,180 @@ begin
 end;
 $$;
 
+-- ---------------------------------------------------------------------
+-- Series: varios partidos seguidos entre los mismos jugadores, cargados
+-- y confirmados de una sola vez. Comparten batch_id.
+-- ---------------------------------------------------------------------
+
+-- p_results: un elemento por partido, en el orden en que se jugaron
+-- (true = ganó el equipo de quien carga). En 1v1, p_partner_id y
+-- p_opponent_partner_id van en null. Devuelve el batch_id.
+create or replace function public.report_series(
+  p_mode                public.match_mode,
+  p_partner_id          uuid,
+  p_opponent_id         uuid,
+  p_opponent_partner_id uuid,
+  p_results             boolean[]
+)
+returns uuid
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_me       uuid := auth.uid();
+  v_batch    uuid := gen_random_uuid();
+  v_n        integer := coalesce(array_length(p_results, 1), 0);
+  v_partner  uuid := case when p_mode = 'doubles' then p_partner_id end;
+  v_opp2     uuid := case when p_mode = 'doubles' then p_opponent_partner_id end;
+  v_ids      uuid[];
+  v_i        integer;
+begin
+  if v_me is null then
+    raise exception 'Tenés que iniciar sesión.';
+  end if;
+  if not exists (select 1 from public.profiles where id = v_me) then
+    raise exception 'Completá tu perfil antes de cargar partidos.';
+  end if;
+  if v_n = 0 then
+    raise exception 'Cargá al menos un resultado.';
+  end if;
+  if v_n > 20 then
+    raise exception 'Se pueden cargar hasta 20 partidos de una vez.';
+  end if;
+  if array_position(p_results, null) is not null then
+    raise exception 'Indicá quién ganó cada partido.';
+  end if;
+
+  v_ids := case when p_mode = 'singles'
+                then array[v_me, p_opponent_id]
+                else array[v_me, v_partner, p_opponent_id, v_opp2] end;
+
+  if array_position(v_ids, null) is not null then
+    if p_mode = 'singles' then
+      raise exception 'Elegí a tu rival.';
+    end if;
+    raise exception 'Elegí a tu compañero y a los dos rivales.';
+  end if;
+  if (select count(distinct x) from unnest(v_ids) as x) <> array_length(v_ids, 1) then
+    raise exception 'Los jugadores tienen que ser distintos.';
+  end if;
+  if (select count(*) from public.profiles where id = any (v_ids)) <> array_length(v_ids, 1) then
+    raise exception 'Alguno de los jugadores no existe.';
+  end if;
+
+  -- Evita el doble envío accidental.
+  if exists (
+    select 1 from public.matches
+     where reporter_id = v_me
+       and opponent_id = p_opponent_id
+       and status = 'pending'
+       and created_at > now() - interval '30 seconds'
+  ) then
+    raise exception 'Ya cargaste partidos contra este rival hace instantes.';
+  end if;
+
+  -- created_at escalonado (1 s) para conservar el orden en que se jugaron.
+  for v_i in 1 .. v_n loop
+    insert into public.matches (
+      mode, reporter_id, reporter_partner_id, opponent_id, opponent_partner_id,
+      reporter_won, batch_id, created_at
+    )
+    values (
+      p_mode, v_me, v_partner, p_opponent_id, v_opp2,
+      p_results[v_i], v_batch, now() - make_interval(secs => v_n - v_i)
+    );
+  end loop;
+
+  return v_batch;
+end;
+$$;
+
+-- Confirma todos los partidos pendientes de una serie, en orden. Devuelve cuántos.
+create or replace function public.confirm_batch(p_batch_id uuid)
+returns integer
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_me     uuid := auth.uid();
+  v_match  public.matches;
+  v_count  integer := 0;
+begin
+  if v_me is null then
+    raise exception 'Tenés que iniciar sesión.';
+  end if;
+
+  for v_match in
+    select * from public.matches
+     where batch_id = p_batch_id and status = 'pending'
+     order by created_at, id
+     for update
+  loop
+    if v_me <> v_match.opponent_id and v_me is distinct from v_match.opponent_partner_id then
+      raise exception 'Solo el equipo rival puede confirmar estos partidos.';
+    end if;
+    perform private.settle_match(v_match);
+    update public.matches
+       set status = 'confirmed', resolved_at = now(), confirmed_by = v_me
+     where id = v_match.id;
+    v_count := v_count + 1;
+  end loop;
+
+  if v_count = 0 then
+    raise exception 'No hay partidos pendientes en esta serie.';
+  end if;
+
+  perform private.update_leader(now());
+  return v_count;
+end;
+$$;
+
+create or replace function public.reject_batch(p_batch_id uuid)
+returns integer
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_count integer;
+begin
+  update public.matches
+     set status = 'rejected', resolved_at = now(), confirmed_by = auth.uid()
+   where batch_id = p_batch_id
+     and (opponent_id = auth.uid() or opponent_partner_id = auth.uid())
+     and status = 'pending';
+  get diagnostics v_count = row_count;
+  if v_count = 0 then
+    raise exception 'No se pudo rechazar: la serie no existe, no sos del equipo rival o ya fue resuelta.';
+  end if;
+  return v_count;
+end;
+$$;
+
+create or replace function public.cancel_batch(p_batch_id uuid)
+returns integer
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_count integer;
+begin
+  update public.matches
+     set status = 'cancelled', resolved_at = now()
+   where batch_id = p_batch_id
+     and reporter_id = auth.uid()
+     and status = 'pending';
+  get diagnostics v_count = row_count;
+  if v_count = 0 then
+    raise exception 'No se pudo cancelar: la serie no existe, no la cargaste vos o ya fue resuelta.';
+  end if;
+  return v_count;
+end;
+$$;
+
 create or replace function public.is_nickname_available(p_nickname text)
 returns boolean
 language sql
@@ -585,13 +844,27 @@ as $$
 $$;
 
 -- ---------------------------------------------------------------------
--- Migración a ELO único: si todavía existen las columnas de dobles
--- (versión con dos rankings), se eliminan y se recalcula todo desde cero
--- con las reglas actuales. Corre una sola vez.
+-- Migraciones de versiones anteriores. Si hace falta, se recalcula todo
+-- desde cero con las reglas actuales (corre una sola vez):
+--   · ELO único: se eliminan las columnas de dobles (versión con dos rankings).
+--   · Rachas: se agregan win_streak / best_win_streak y se completan.
+--   · Días en el top 1: se reconstruye el historial de reinados.
 -- ---------------------------------------------------------------------
 
 do $$
+declare
+  v_recalc boolean := false;
 begin
+  if not exists (
+    select 1 from information_schema.columns
+     where table_schema = 'public' and table_name = 'profiles' and column_name = 'win_streak'
+  ) then
+    alter table public.profiles
+      add column win_streak integer not null default 0,
+      add column best_win_streak integer not null default 0;
+    v_recalc := true;
+  end if;
+
   if exists (
     select 1 from information_schema.columns
      where table_schema = 'public' and table_name = 'profiles' and column_name = 'elo_doubles'
@@ -603,6 +876,16 @@ begin
       drop column if exists doubles_losses,
       drop column if exists doubles_last_match_at,
       drop column if exists doubles_decay_weeks_applied;
+    v_recalc := true;
+  end if;
+
+  -- Días en el top 1: si todavía no hay historial pero sí partidos, reconstruirlo.
+  if not exists (select 1 from public.top_reigns)
+     and exists (select 1 from public.matches where status = 'confirmed') then
+    v_recalc := true;
+  end if;
+
+  if v_recalc then
     perform private.recalculate_ratings();
   end if;
 end $$;
@@ -614,9 +897,10 @@ end $$;
 alter table public.profiles   enable row level security;
 alter table public.matches    enable row level security;
 alter table public.elo_events enable row level security;
+alter table public.top_reigns enable row level security;
 
-revoke all on public.profiles, public.matches, public.elo_events from anon, authenticated;
-grant select on public.profiles, public.matches, public.elo_events to authenticated;
+revoke all on public.profiles, public.matches, public.elo_events, public.top_reigns from anon, authenticated;
+grant select on public.profiles, public.matches, public.elo_events, public.top_reigns to authenticated;
 -- Los campos de ELO/estadísticas solo los modifican las funciones de arriba.
 grant insert (id, first_name, last_name, nickname, avatar_url) on public.profiles to authenticated;
 grant update (first_name, last_name, nickname, avatar_url) on public.profiles to authenticated;
@@ -645,6 +929,10 @@ create policy matches_select on public.matches
     or (select auth.uid()) = opponent_partner_id
   );
 
+drop policy if exists top_reigns_select on public.top_reigns;
+create policy top_reigns_select on public.top_reigns
+  for select to authenticated using (true);
+
 drop policy if exists elo_events_select_own on public.elo_events;
 create policy elo_events_select_own on public.elo_events
   for select to authenticated using (profile_id = (select auth.uid()));
@@ -658,6 +946,10 @@ revoke execute on function public.report_doubles_match(uuid, uuid, uuid, boolean
 revoke execute on function public.confirm_match(uuid) from public, anon;
 revoke execute on function public.reject_match(uuid) from public, anon;
 revoke execute on function public.cancel_match(uuid) from public, anon;
+revoke execute on function public.report_series(public.match_mode, uuid, uuid, uuid, boolean[]) from public, anon;
+revoke execute on function public.confirm_batch(uuid) from public, anon;
+revoke execute on function public.reject_batch(uuid) from public, anon;
+revoke execute on function public.cancel_batch(uuid) from public, anon;
 revoke execute on function public.is_nickname_available(text) from public;
 
 grant execute on function public.apply_inactivity_decay() to authenticated;
@@ -666,6 +958,10 @@ grant execute on function public.report_doubles_match(uuid, uuid, uuid, boolean)
 grant execute on function public.confirm_match(uuid) to authenticated;
 grant execute on function public.reject_match(uuid) to authenticated;
 grant execute on function public.cancel_match(uuid) to authenticated;
+grant execute on function public.report_series(public.match_mode, uuid, uuid, uuid, boolean[]) to authenticated;
+grant execute on function public.confirm_batch(uuid) to authenticated;
+grant execute on function public.reject_batch(uuid) to authenticated;
+grant execute on function public.cancel_batch(uuid) to authenticated;
 grant execute on function public.is_nickname_available(text) to anon, authenticated;
 
 -- ---------------------------------------------------------------------

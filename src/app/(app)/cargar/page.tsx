@@ -11,7 +11,8 @@ export const metadata: Metadata = { title: "Cargar partido" };
 type RecentMatch = Pick<Match, "reporter_id" | "reporter_partner_id" | "opponent_id" | "opponent_partner_id">;
 
 export default async function ReportMatchPage({ searchParams }: PageProps<"/cargar">) {
-  const initialMode = parseMode((await searchParams).modo) ?? "singles";
+  const { modo, rival } = await searchParams;
+  const initialMode = parseMode(modo) ?? "singles";
   const { profile } = await getSession();
   const me = profile!;
   const supabase = await createClient();
@@ -43,6 +44,7 @@ export default async function ReportMatchPage({ searchParams }: PageProps<"/carg
         players={(players ?? []) as PlayerSummary[]}
         recentIds={recentIds}
         initialMode={initialMode}
+        initialRivalId={typeof rival === "string" ? rival : null}
       />
     </div>
   );

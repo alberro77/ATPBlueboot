@@ -4,6 +4,8 @@
 export const INITIAL_ELO = 1000;
 export const K_FACTOR = 32;
 export const MIN_MATCHES_TO_RANK = 3;
+/** Victorias seguidas a partir de las cuales un jugador está "on fire". */
+export const ON_FIRE_STREAK = 3;
 
 export function expectedScore(rating: number, opponentRating: number) {
   return 1 / (1 + Math.pow(10, (opponentRating - rating) / 400));
@@ -17,4 +19,20 @@ export function eloDelta(winnerElo: number, loserElo: number) {
 /** ELO de un equipo: promedio de sus integrantes (en 1v1, el del jugador). */
 export function teamElo(players: { elo: number }[]) {
   return players.reduce((sum, p) => sum + p.elo, 0) / players.length;
+}
+
+/**
+ * Simula una serie de partidos en orden (true = ganó mi equipo) y devuelve el
+ * ELO total que gana (+) o pierde (−) mi equipo. Sirve de estimación: el cálculo
+ * real lo hace la base al confirmar.
+ */
+export function seriesDelta(myElo: number, rivalElo: number, results: boolean[]) {
+  let total = 0;
+  for (const won of results) {
+    const d = won ? eloDelta(myElo, rivalElo) : -eloDelta(rivalElo, myElo);
+    myElo += d;
+    rivalElo -= d;
+    total += d;
+  }
+  return total;
 }

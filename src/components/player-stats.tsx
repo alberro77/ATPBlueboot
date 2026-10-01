@@ -1,9 +1,10 @@
+import Link from "next/link";
 import { Flame, Handshake, Swords } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { PlayerAvatar } from "@/components/player-avatar";
 import { perspective } from "@/components/match-views";
-import { MIN_MATCHES_TO_RANK } from "@/lib/elo";
-import { fullName } from "@/lib/format";
+import { MIN_MATCHES_TO_RANK, ON_FIRE_STREAK } from "@/lib/elo";
+import { fullName, playerHref } from "@/lib/format";
 import type { MatchWithPlayers, PlayerSummary, Profile } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -11,19 +12,18 @@ function byDateDesc(a: MatchWithPlayers, b: MatchWithPlayers) {
   return b.created_at.localeCompare(a.created_at);
 }
 
-/** Últimos 5 resultados confirmados y racha actual. */
-function recentForm(matches: MatchWithPlayers[], playerId: string) {
-  const results = matches
+/** Últimos 5 resultados confirmados. */
+function lastResults(matches: MatchWithPlayers[], playerId: string) {
+  return matches
     .filter((m) => m.status === "confirmed")
     .sort(byDateDesc)
+    .slice(0, 5)
     .map((m) => perspective(m, playerId).won);
-  let streak = 0;
-  while (streak < results.length && results[streak] === results[0]) streak++;
-  return { last: results.slice(0, 5), streak, winning: results[0] === true };
 }
 
 export function StatsCard({ profile, matches }: { profile: Profile; matches: MatchWithPlayers[] }) {
-  const form = recentForm(matches, profile.id);
+  const last = lastResults(matches, profile.id);
+  const onFire = profile.win_streak >= ON_FIRE_STREAK;
   const winRate = profile.matches_played > 0 ? Math.round((profile.wins / profile.matches_played) * 100) : null;
   const stats = [
     { label: "Jugados", value: profile.matches_played },
@@ -42,11 +42,11 @@ export function StatsCard({ profile, matches }: { profile: Profile; matches: Mat
           </div>
         ))}
       </CardContent>
-      {form.last.length > 0 && (
+      {last.length > 0 && (
         <div className="flex items-center justify-between border-t px-4 py-3">
           <div className="flex items-center gap-1.5" aria-label="Últimos resultados">
             <span className="mr-1 text-xs text-muted-foreground">Últimos</span>
-            {form.last.map((won, i) => (
+            {last.map((won, i) => (
               <span
                 key={i}
                 className={cn(
@@ -58,17 +58,18 @@ export function StatsCard({ profile, matches }: { profile: Profile; matches: Mat
               </span>
             ))}
           </div>
-          {form.streak >= 2 && (
-            <span
+          <div className="text-right text-xs leading-tight">
+            <p
               className={cn(
-                "flex items-center gap-1 text-xs font-semibold",
-                form.winning ? "text-orange-500" : "text-muted-foreground",
+                "flex items-center justify-end gap-1 font-bold",
+                onFire ? "text-orange-500" : profile.win_streak > 0 ? "text-foreground" : "text-muted-foreground",
               )}
             >
-              {form.winning && <Flame className="size-4 fill-orange-400" />}
-              {form.streak} {form.winning ? "al hilo" : "derrotas"}
-            </span>
-          )}
+              <Flame className={cn("size-4", onFire && "fill-orange-400")} />
+              {profile.win_streak > 0 ? `${profile.win_streak} al hilo` : "Sin racha"}
+            </p>
+            <p className="text-muted-foreground">Mejor racha: {profile.best_win_streak}</p>
+          </div>
         </div>
       )}
       {profile.matches_played < MIN_MATCHES_TO_RANK && (
@@ -109,7 +110,19 @@ export function computeRelations(matches: MatchWithPlayers[], playerId: string) 
   return { rival: top(rivals), partner: top(partners) };
 }
 
-export function RelationCards({ rival, partner }: { rival: Relation | null; partner: Relation | null }) {
+export function RelationCards({
+  rival,
+  partner,
+  viewerId,
+  emptyRival = "Todavía no jugaste contra nadie.",
+  emptyPartner = "Jugá un 2 vs 2 para tener compañero.",
+}: {
+  rival: Relation | null;
+  partner: Relation | null;
+  viewerId: string;
+  emptyRival?: string;
+  emptyPartner?: string;
+}) {
   return (
     <div className="grid grid-cols-2 gap-3">
       <RelationCard
@@ -117,14 +130,16 @@ export function RelationCards({ rival, partner }: { rival: Relation | null; part
         title="Clásico rival"
         relation={rival}
         detail={(r) => `${r.games} ${r.games === 1 ? "partido" : "partidos"} en contra`}
-        empty="Todavía no jugaste contra nadie."
+        empty={emptyRival}
+        viewerId={viewerId}
       />
       <RelationCard
         icon={Handshake}
         title="Compañero"
         relation={partner}
         detail={(r) => `${r.games} ${r.games === 1 ? "partido" : "partidos"} juntos`}
-        empty="Jugá un 2 vs 2 para tener compañero."
+        empty={emptyPartner}
+        viewerId={viewerId}
       />
     </div>
   );
@@ -136,12 +151,14 @@ function RelationCard({
   relation,
   detail,
   empty,
+  viewerId,
 }: {
   icon: typeof Swords;
   title: string;
   relation: Relation | null;
   detail: (r: Relation) => string;
   empty: string;
+  viewerId: string;
 }) {
   return (
     <Card className="gap-0 py-0">
@@ -151,11 +168,18 @@ function RelationCard({
         </span>
         {relation ? (
           <>
-            <PlayerAvatar player={relation.player} size={56} className="ring-2 ring-primary/25" />
-            <div className="w-full min-w-0">
-              <p className="truncate font-bold">{relation.player.nickname}</p>
-              <p className="truncate text-[0.7rem] text-muted-foreground">{fullName(relation.player)}</p>
-            </div>
+            <Link
+              href={playerHref(relation.player.id, viewerId)}
+              className="flex w-full min-w-0 flex-col items-center gap-2 rounded-xl transition-opacity hover:opacity-80"
+            >
+              <PlayerAvatar player={relation.player} size={56} className="ring-2 ring-primary/25" />
+              <div className="w-full min-w-0">
+                <p className="truncate font-bold">
+                  {relation.player.id === viewerId ? "Vos" : relation.player.nickname}
+                </p>
+                <p className="truncate text-[0.7rem] text-muted-foreground">{fullName(relation.player)}</p>
+              </div>
+            </Link>
             <p className="text-xs text-muted-foreground">{detail(relation)}</p>
             <RecordBar wins={relation.wins} losses={relation.losses} />
           </>
@@ -168,7 +192,7 @@ function RelationCard({
 }
 
 /** Barra de victorias (verde) contra derrotas (rojo). */
-function RecordBar({ wins, losses }: { wins: number; losses: number }) {
+export function RecordBar({ wins, losses }: { wins: number; losses: number }) {
   const total = wins + losses;
   return (
     <div className="w-full">

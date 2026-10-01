@@ -1,13 +1,15 @@
 import Link from "next/link";
-import { Info, Plus, Swords, Users } from "lucide-react";
+import { Flame, Info, Plus, Swords, Users } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { EmptyState, PageHeader } from "@/components/page-header";
 import { PlayerAvatar } from "@/components/player-avatar";
 import { MatchesProgress, Podium, RankingTable } from "@/components/ranking-table";
+import { StreakBadge } from "@/components/streak-badge";
 import { getSession } from "@/lib/data";
-import { MIN_MATCHES_TO_RANK } from "@/lib/elo";
+import { MIN_MATCHES_TO_RANK, ON_FIRE_STREAK } from "@/lib/elo";
 import { createClient } from "@/lib/supabase/server";
+import { playerHref, reignDays, type Reign } from "@/lib/format";
 import type { Profile } from "@/lib/types";
 
 export default async function RankingPage() {
@@ -17,6 +19,12 @@ export default async function RankingPage() {
 
   // Aplica el decay por inactividad pendiente (idempotente; complementa al cron diario).
   await supabase.rpc("apply_inactivity_decay");
+
+  const { data: openReign } = await supabase
+    .from("top_reigns")
+    .select("profile_id, started_at, ended_at")
+    .is("ended_at", null)
+    .maybeSingle<Reign & { profile_id: string }>();
 
   const { data } = await supabase
     .from("profiles")
@@ -30,12 +38,16 @@ export default async function RankingPage() {
   const unranked = players
     .filter((p) => p.matches_played < MIN_MATCHES_TO_RANK)
     .sort((a, b) => b.matches_played - a.matches_played || b.elo - a.elo);
+  const onFire = players
+    .filter((p) => p.win_streak >= ON_FIRE_STREAK)
+    .sort((a, b) => b.win_streak - a.win_streak || b.elo - a.elo);
 
   return (
     <>
       <PageHeader title="Ranking" description="1 vs 1 y 2 vs 2 suman al mismo ELO." />
 
       <MyPositionCard me={me} ranked={ranked} />
+      {onFire.length > 0 && <OnFireStrip players={onFire} currentUserId={me.id} />}
 
       <Tabs defaultValue="oficial">
         <TabsList className="h-10 w-full sm:w-auto">
@@ -50,7 +62,11 @@ export default async function RankingPage() {
         <TabsContent value="oficial" className="mt-3">
           {ranked.length > 0 ? (
             <>
-              <Podium players={ranked.slice(0, 3)} currentUserId={me.id} />
+              <Podium
+                players={ranked.slice(0, 3)}
+                currentUserId={me.id}
+                leaderDays={openReign?.profile_id === ranked[0].id ? reignDays([openReign]) : null}
+              />
               {ranked.length > 3 && (
                 <RankingTable players={ranked.slice(3)} startIndex={3} currentUserId={me.id} ranked />
               )}
@@ -99,7 +115,9 @@ function MyPositionCard({ me, ranked }: { me: Profile; ranked: Profile[] }) {
     >
       <PlayerAvatar player={me} size={48} className="ring-2 ring-white/70" />
       <div className="min-w-0 flex-1">
-        <p className="text-xs font-medium text-white/75">Tu posición</p>
+        <p className="flex items-center gap-1.5 text-xs font-medium text-white/75">
+          Tu posición <StreakBadge streak={me.win_streak} />
+        </p>
         {position > 0 ? (
           <p className="text-2xl leading-tight font-extrabold">
             #{position} <span className="text-sm font-medium text-white/75">de {ranked.length}</span>
@@ -116,5 +134,35 @@ function MyPositionCard({ me, ranked }: { me: Profile; ranked: Profile[] }) {
         <p className="text-2xl leading-tight font-extrabold tabular-nums">{me.elo}</p>
       </div>
     </Link>
+  );
+}
+
+/** Jugadores con 3 o más victorias seguidas, de mayor a menor racha. */
+function OnFireStrip({ players, currentUserId }: { players: Profile[]; currentUserId: string }) {
+  return (
+    <section className="mb-5 rounded-2xl border border-orange-300/50 bg-linear-to-br from-orange-50 to-amber-50 p-4 dark:border-orange-500/25 dark:from-orange-500/10 dark:to-amber-500/5">
+      <h2 className="mb-3 flex items-center gap-1.5 text-sm font-extrabold text-orange-600 dark:text-orange-400">
+        <Flame className="size-4 fill-orange-400" /> On fire
+        <span className="font-medium text-orange-600/70 dark:text-orange-400/70">· victorias seguidas</span>
+      </h2>
+      <ul className="-mx-4 flex gap-4 overflow-x-auto px-4 pb-1">
+        {players.map((p) => (
+          <li key={p.id} className="shrink-0">
+            <Link
+              href={playerHref(p.id, currentUserId)}
+              className="flex w-16 flex-col items-center gap-1.5 text-center transition-transform active:scale-95"
+            >
+            <div className="relative">
+              <PlayerAvatar player={p} size={52} className="ring-2 ring-orange-400" />
+              <StreakBadge streak={p.win_streak} className="absolute -right-2 -bottom-1 ring-2 ring-orange-50 dark:ring-background" />
+            </div>
+            <span className="w-full truncate text-xs font-semibold">
+              {p.id === currentUserId ? "Vos" : p.nickname}
+            </span>
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }

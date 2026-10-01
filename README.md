@@ -4,10 +4,11 @@ Ranking ELO de ping pong de BlueBoot. Mobile-first, hecho con Next.js 16 (App Ro
 
 ## Funcionalidades
 
-- **Ranking único**: 1 vs 1 y 2 vs 2 suman al mismo ELO. Tarjeta con tu posición, podio para el top 3 y tabla con el resto. Ranking oficial (3+ partidos confirmados) y pestaña "Sin clasificar" con el progreso hacia los 3 partidos.
-- **Cargar partido en segundos**: una sola pantalla con tu equipo contra los rivales. Tocás un lugar vacío (o un jugador de "Jugaste hace poco") y después **Gané** o **Perdí**, que ya muestran los puntos en juego y envían el resultado. En 1v1 con un rival reciente son dos toques. No se carga el marcador.
-- **Mis partidos**: partidos para confirmar o rechazar, los que esperan al rival (los podés cancelar si los cargaste vos) e historial.
-- **Perfil**: tu ELO y posición, estadísticas (jugados, ganados, perdidos, efectividad, últimos 5 y racha), **clásico rival** (con quien más jugaste en contra, en 1v1 o 2v2) y **compañero** (con quien más jugaste juntos en 2v2), cada uno con el historial de victorias y derrotas. Datos y foto editables.
+- **Ranking único**: 1 vs 1 y 2 vs 2 suman al mismo ELO. Tarjeta con tu posición, franja **On fire** con los jugadores en racha (3+ victorias seguidas), podio para el top 3 (el #1 muestra cuántos días lleva en la cima) y tabla con el resto. Ranking oficial (3+ partidos confirmados) y pestaña "Sin clasificar".
+- **Cargar partidos en segundos**: una sola pantalla con tu equipo contra los rivales. Tocás un lugar vacío (o un jugador de "Jugaste hace poco") y después **Gané** / **Perdí** una vez por cada partido, en orden: así se cargan series de varios partidos entre los mismos jugadores de una vez. Muestra lo que se juega en cada partido y el total estimado. No se carga el marcador.
+- **Mis partidos**: partidos para confirmar o rechazar (una serie se confirma o rechaza completa con un toque), los que esperan al rival (los podés cancelar si los cargaste vos) e historial.
+- **Perfil**: tu ELO, posición y **días en el #1**, estadísticas (jugados, ganados, perdidos, efectividad, últimos 5, racha actual y mejor racha), **clásico rival** y **compañero**. Datos y foto editables.
+- **Perfil de otros jugadores** (`/jugador/[id]`): se abre tocando a cualquiera en el ranking, el podio, la franja On fire o las tarjetas de rival/compañero. Muestra lo mismo que el tuyo, el **cara a cara con vos** (y los partidos que jugaron juntos en 2v2), sus últimos partidos y un botón **Desafiar** que abre la carga con ese rival elegido.
 - **Historial**: todos los partidos confirmados de la empresa, con filtro 1v1 / 2v2, paginados.
 - **App instalable (PWA)**: desde el celular se puede agregar a la pantalla de inicio y abre a pantalla completa. En Android/Chrome aparece un botón "Instalar"; en iPhone, la app muestra cómo hacerlo (Compartir → Agregar a inicio).
 - **Fotos**: se recortan en cuadrado y se comprimen a 256×256 WebP (~30 KB) en el navegador antes de subirse a Supabase Storage; el bucket rechaza archivos de más de 512 KB o que no sean imágenes.
@@ -25,6 +26,9 @@ Todas viven en la base de datos (`supabase/schema.sql`), en funciones `security 
 | Mínimo 3 partidos | 3+ partidos confirmados (1v1 y 2v2 suman) para entrar al ranking oficial |
 | Decay por inactividad | Clasificado con 7+ días sin jugar: −10 por cada semana (7 días −10, 14 días −20, etc.). Cuenta la fecha en que **se jugó** el partido: si una confirmación tardía demuestra que el jugador sí jugó, se le devuelven las semanas cobradas de más. Lo aplica `apply_inactivity_decay()` a diario vía `pg_cron` y al abrir el ranking. Es idempotente |
 | Resultado | Solo se carga quién ganó (`reporter_won`). Los partidos viejos con marcador lo conservan |
+| Series | `report_series()` carga hasta 20 partidos seguidos entre los mismos jugadores (comparten `batch_id`, en el orden en que se jugaron); `confirm_batch()` / `reject_batch()` / `cancel_batch()` los resuelven juntos |
+| Rachas | `win_streak` (victorias seguidas actuales) y `best_win_streak`. Un partido confirmado tarde y anterior al último no corta ni alarga la racha |
+| Días en el #1 | `top_reigns` registra cada período como #1 del ranking oficial; se actualiza al confirmar partidos y al aplicar decay |
 | Recalcular | `select private.recalculate_ratings();` recalcula todos los ELO desde cero repasando los partidos confirmados en el orden en que se jugaron. Se ejecutó automáticamente al pasar de dos rankings a uno |
 
 ## Puesta en marcha
