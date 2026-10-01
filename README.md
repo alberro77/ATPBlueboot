@@ -1,4 +1,4 @@
-# ATPBlueboot
+# Blue League
 
 Ranking ELO de ping pong de BlueBoot. Mobile-first, hecho con Next.js 16 (App Router), Tailwind CSS v4, Shadcn UI (Base UI) y Supabase.
 

@@ -3,9 +3,9 @@ import type { MetadataRoute } from "next";
 export default function manifest(): MetadataRoute.Manifest {
   return {
     id: "/",
-    name: "Ping Pong BlueBoot",
-    short_name: "Ping Pong",
-    description: "Ranking ELO de ping pong de BlueBoot.",
+    name: "Blue League",
+    short_name: "Blue League",
+    description: "Blue League: el ranking de ping pong de BlueBoot.",
     lang: "es",
     start_url: "/",
     scope: "/",

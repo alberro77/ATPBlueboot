@@ -16,14 +16,14 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: {
-    default: "Ping Pong · BlueBoot",
-    template: "%s · Ping Pong BlueBoot",
+    default: "Blue League",
+    template: "%s · Blue League",
   },
-  description: "Ranking ELO de ping pong de BlueBoot.",
-  applicationName: "Ping Pong BlueBoot",
+  description: "Blue League: el ranking de ping pong de BlueBoot.",
+  applicationName: "Blue League",
   appleWebApp: {
     capable: true,
-    title: "Ping Pong",
+    title: "Blue League",
     statusBarStyle: "default",
   },
   icons: {

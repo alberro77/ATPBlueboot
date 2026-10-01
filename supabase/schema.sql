@@ -1,5 +1,5 @@
 -- =====================================================================
--- ATP Ping Pong · BlueBoot — Esquema de base de datos
+-- Blue League (ping pong · BlueBoot) — Esquema de base de datos
 --
 -- Cómo usarlo: Supabase Dashboard → SQL Editor → New query → pegar todo → Run.
 -- El script es idempotente: se puede volver a ejecutar sin perder datos

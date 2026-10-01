@@ -1,4 +1,4 @@
-// Service worker de Ping Pong BlueBoot.
+// Service worker de Blue League.
 // Hace la app instalable y muestra una pantalla offline si no hay conexión.
 // No cachea páginas ni datos: el ranking siempre se ve actualizado.
 

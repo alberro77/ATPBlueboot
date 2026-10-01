@@ -37,7 +37,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           <Link href="/" className="flex items-center gap-2.5">
             <BlueBootIcon inverted className="size-9" />
             <span className="leading-tight">
-              <span className="block text-base font-bold">Ping Pong</span>
+              <span className="block text-base font-bold">Blue League</span>
               <span className="block text-[0.65rem] font-semibold tracking-[0.2em] text-white/75">BLUEBOOT</span>
             </span>
           </Link>
