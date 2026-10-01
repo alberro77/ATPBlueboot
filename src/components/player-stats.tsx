@@ -1,11 +1,11 @@
 import Link from "next/link";
-import { Flame, Handshake, Swords } from "lucide-react";
+import { Flame, Handshake, Swords, User, Users } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { PlayerAvatar } from "@/components/player-avatar";
 import { perspective } from "@/components/match-views";
 import { MIN_MATCHES_TO_RANK, ON_FIRE_STREAK } from "@/lib/elo";
-import { fullName, playerHref } from "@/lib/format";
-import type { MatchWithPlayers, PlayerSummary, Profile } from "@/lib/types";
+import { fullName, playerHref, signed } from "@/lib/format";
+import type { MatchWithPlayers, Mode, PlayerSummary, Profile } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 function byDateDesc(a: MatchWithPlayers, b: MatchWithPlayers) {
@@ -204,6 +204,151 @@ export function RecordBar({ wins, losses }: { wins: number; losses: number }) {
         <span className="text-success">{wins}V</span>
         <span className="text-destructive">{losses}D</span>
       </div>
+    </div>
+  );
+}
+
+export type ModeRecord = {
+  games: number;
+  wins: number;
+  losses: number;
+  /** Victorias seguidas actuales y mejor racha en la modalidad. */
+  streak: number;
+  bestStreak: number;
+  /** Últimos 5 resultados, del más nuevo al más viejo (true = victoria). */
+  last: boolean[];
+  /** ELO neto ganado (+) o perdido (−) en partidos de esta modalidad. */
+  eloChange: number;
+};
+
+/** Récord y estadísticas del jugador en una modalidad (1 vs 1 o 2 vs 2). */
+export function computeModeRecord(matches: MatchWithPlayers[], playerId: string, mode: Mode): ModeRecord {
+  const list = matches
+    .filter((m) => m.status === "confirmed" && m.mode === mode)
+    .sort((a, b) => a.created_at.localeCompare(b.created_at) || a.id.localeCompare(b.id));
+  let wins = 0;
+  let streak = 0;
+  let best = 0;
+  let eloChange = 0;
+  const results: boolean[] = [];
+  for (const m of list) {
+    const p = perspective(m, playerId);
+    results.push(p.won);
+    eloChange += p.delta ?? 0;
+    if (p.won) {
+      wins++;
+      streak++;
+      best = Math.max(best, streak);
+    } else {
+      streak = 0;
+    }
+  }
+  return {
+    games: list.length,
+    wins,
+    losses: list.length - wins,
+    streak,
+    bestStreak: best,
+    last: results.slice(-5).reverse(),
+    eloChange,
+  };
+}
+
+/** Récord y estadísticas separadas por modalidad. */
+export function ModeStatsCards({ matches, playerId }: { matches: MatchWithPlayers[]; playerId: string }) {
+  return (
+    <section className="grid gap-2">
+      <h2 className="text-base font-bold">Récord por modalidad</h2>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <ModeCard mode="singles" record={computeModeRecord(matches, playerId, "singles")} />
+        <ModeCard mode="doubles" record={computeModeRecord(matches, playerId, "doubles")} />
+      </div>
+    </section>
+  );
+}
+
+function ModeCard({ mode, record: r }: { mode: Mode; record: ModeRecord }) {
+  const winRate = r.games > 0 ? Math.round((r.wins / r.games) * 100) : null;
+  return (
+    <Card className="gap-0 py-0">
+      <CardContent className="grid gap-3 px-4 py-4">
+        <div className="flex items-center justify-between">
+          <span className="flex items-center gap-1.5 text-xs font-bold text-muted-foreground uppercase">
+            {mode === "singles" ? <User className="size-3.5 text-primary" /> : <Users className="size-3.5 text-primary" />}
+            {mode === "singles" ? "1 vs 1" : "2 vs 2"}
+          </span>
+          {r.games > 0 && (
+            <span
+              className={cn(
+                "rounded-full px-2 py-0.5 text-xs font-bold tabular-nums",
+                r.eloChange > 0
+                  ? "bg-success/15 text-success"
+                  : r.eloChange < 0
+                    ? "bg-destructive/10 text-destructive"
+                    : "bg-muted text-muted-foreground",
+              )}
+            >
+              {r.eloChange === 0 ? "±0" : signed(r.eloChange)} ELO
+            </span>
+          )}
+        </div>
+
+        {r.games === 0 ? (
+          <p className="py-4 text-center text-sm text-muted-foreground">
+            {mode === "singles" ? "Todavía no jugó 1 vs 1." : "Todavía no jugó 2 vs 2."}
+          </p>
+        ) : (
+          <>
+            <div className="flex items-end justify-between">
+              <p className="text-3xl leading-none font-extrabold tabular-nums">
+                <span className="text-success">{r.wins}</span>
+                <span className="text-muted-foreground"> - </span>
+                <span className="text-destructive">{r.losses}</span>
+              </p>
+              <p className="text-sm font-semibold tabular-nums">
+                {winRate}% <span className="font-normal text-muted-foreground">efectividad</span>
+              </p>
+            </div>
+            <RecordBar wins={r.wins} losses={r.losses} />
+            <div className="grid grid-cols-3 gap-2 text-center">
+              <MiniStat label="Jugados" value={r.games} />
+              <MiniStat label="Racha actual" value={r.streak} fire={r.streak >= ON_FIRE_STREAK} />
+              <MiniStat label="Mejor racha" value={r.bestStreak} />
+            </div>
+            <div className="flex items-center gap-1.5 border-t pt-3" aria-label="Últimos resultados">
+              <span className="mr-1 text-xs text-muted-foreground">Últimos</span>
+              {r.last.map((won, i) => (
+                <span
+                  key={i}
+                  className={cn(
+                    "flex size-6 items-center justify-center rounded-full text-[0.65rem] font-bold text-white",
+                    won ? "bg-success" : "bg-destructive",
+                  )}
+                >
+                  {won ? "V" : "D"}
+                </span>
+              ))}
+            </div>
+          </>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function MiniStat({ label, value, fire = false }: { label: string; value: number; fire?: boolean }) {
+  return (
+    <div className="rounded-xl bg-muted/60 px-1 py-2">
+      <p
+        className={cn(
+          "flex items-center justify-center gap-0.5 text-lg leading-none font-extrabold tabular-nums",
+          fire && "text-orange-500",
+        )}
+      >
+        {fire && <Flame className="size-4 fill-orange-400" />}
+        {value}
+      </p>
+      <p className="mt-1 text-[0.65rem] text-muted-foreground">{label}</p>
     </div>
   );
 }

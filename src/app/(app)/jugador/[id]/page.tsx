@@ -6,8 +6,9 @@ import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { EmptyState, SectionTitle } from "@/components/page-header";
 import { MyMatchRow, perspective } from "@/components/match-views";
-import { computeRelations, RecordBar, RelationCards, StatsCard } from "@/components/player-stats";
+import { computeRelations, ModeStatsCards, RecordBar, RelationCards, StatsCard } from "@/components/player-stats";
 import { EloChart } from "@/components/elo-chart";
+import { ChallengeButton } from "@/components/challenge-button";
 import { ProfileHero } from "@/components/profile-hero";
 import { WinChance } from "@/components/win-chance";
 import { getSession } from "@/lib/data";
@@ -53,6 +54,7 @@ export default async function PlayerPage({ params }: PageProps<"/jugador/[id]">)
       <ProfileHero profile={player} isMe={false} {...data} />
       <HeadToHead player={player} me={me} matches={data.matches} />
       <StatsCard profile={player} matches={data.matches} />
+      <ModeStatsCards matches={data.matches} playerId={player.id} />
       <EloChart points={data.eloHistory} nowMs={nowMs()} />
       <RelationCards
         rival={rival}
@@ -105,12 +107,15 @@ function HeadToHead({ player, me, matches }: { player: Profile; me: Profile; mat
           <span className="flex items-center gap-1.5 text-xs font-bold text-muted-foreground uppercase">
             <Swords className="size-3.5 text-primary" /> Cara a cara 1 vs 1
           </span>
-          <Link
-            href={`/cargar?rival=${player.id}`}
-            className={cn(buttonVariants({ size: "sm" }), "bg-brand rounded-full px-3")}
-          >
-            <Swords /> Desafiar
-          </Link>
+          <div className="flex items-center gap-2">
+            <Link
+              href={`/cargar?rival=${player.id}`}
+              className={cn(buttonVariants({ size: "sm", variant: "outline" }), "rounded-full px-3")}
+            >
+              Cargar partido
+            </Link>
+            <ChallengeButton targetId={player.id} nickname={player.nickname} />
+          </div>
         </div>
         {played === 0 ? (
           <p className="text-center text-sm text-muted-foreground">

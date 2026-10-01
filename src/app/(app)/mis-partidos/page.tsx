@@ -1,14 +1,15 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Clock, Hourglass, Inbox, PartyPopper, Plus, TrendingDown, Trophy } from "lucide-react";
+import { Clock, Hourglass, Inbox, PartyPopper, Plus, Swords, TrendingDown, Trophy } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { EmptyState, PageHeader, SectionTitle } from "@/components/page-header";
+import { PlayerAvatar } from "@/components/player-avatar";
 import { CancelButton, ConfirmRejectButtons, type MatchTarget } from "@/components/match-actions";
 import { DeltaPill, ModeBadge, MyMatchRow, perspective, TeamAvatars, teamName } from "@/components/match-views";
-import { getSession, involving, MATCH_FIELDS } from "@/lib/data";
+import { getSession, involving, MATCH_FIELDS, PLAYER_FIELDS } from "@/lib/data";
 import { seriesDelta, teamElo } from "@/lib/elo";
-import { daysAgoIso, formatDate } from "@/lib/format";
+import { daysAgoIso, formatDate, playerHref } from "@/lib/format";
 import { createClient } from "@/lib/supabase/server";
 import type { EloEvent, MatchWithPlayers, PlayerSummary, Profile } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -39,7 +40,7 @@ export default async function MyMatchesPage() {
   const me = profile!;
   const supabase = await createClient();
 
-  const [{ data: matchData }, { data: decayData }] = await Promise.all([
+  const [{ data: matchData }, { data: decayData }, { data: challengeData }] = await Promise.all([
     supabase
       .from("matches")
       .select(MATCH_FIELDS)
@@ -52,7 +53,20 @@ export default async function MyMatchesPage() {
       .eq("profile_id", me.id)
       .eq("kind", "decay")
       .gte("created_at", daysAgoIso(30)),
+    supabase
+      .from("challenges")
+      .select(`id, created_at, challenger:profiles!challenges_challenger_id_fkey(${PLAYER_FIELDS})`)
+      .eq("challenged_id", me.id)
+      .gte("created_at", daysAgoIso(3))
+      .order("created_at", { ascending: false })
+      .limit(20),
   ]);
+
+  // Un desafío por jugador (el más reciente), de los últimos 3 días.
+  const challenges = new Map<string, { player: PlayerSummary; at: string }>();
+  for (const c of (challengeData ?? []) as unknown as { created_at: string; challenger: PlayerSummary }[]) {
+    if (!challenges.has(c.challenger.id)) challenges.set(c.challenger.id, { player: c.challenger, at: c.created_at });
+  }
 
   const matches = (matchData ?? []) as unknown as MatchWithPlayers[];
   const decayPoints = -((decayData ?? []) as EloEvent[]).reduce((s, d) => s + d.delta, 0);
@@ -84,6 +98,36 @@ export default async function MyMatchesPage() {
             <p className="text-muted-foreground">Jugá un partido para frenar el descuento.</p>
           </div>
         </div>
+      )}
+
+      {challenges.size > 0 && (
+        <section className="grid gap-3">
+          <SectionTitle icon={Swords} count={challenges.size}>
+            Te desafiaron
+          </SectionTitle>
+          <ul className="grid gap-2">
+            {[...challenges.values()].map(({ player, at }) => (
+              <li
+                key={player.id}
+                className="flex items-center gap-3 rounded-2xl border border-primary/30 bg-accent/50 p-3 shadow-sm"
+              >
+                <Link href={playerHref(player.id, me.id)} className="flex min-w-0 flex-1 items-center gap-3">
+                  <PlayerAvatar player={player} size={44} />
+                  <span className="min-w-0">
+                    <span className="block truncate text-sm font-bold">{player.nickname} te desafió</span>
+                    <span className="block text-xs text-muted-foreground">{formatDate(at)}</span>
+                  </span>
+                </Link>
+                <Link
+                  href={`/cargar?rival=${player.id}`}
+                  className={cn(buttonVariants({ size: "sm" }), "bg-brand rounded-full px-3")}
+                >
+                  Jugar
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
       )}
 
       <section className="grid gap-3">

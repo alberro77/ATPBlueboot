@@ -23,6 +23,9 @@
 --   · Temporadas: cada mes calendario (hora de Argentina) es una temporada.
 --     El ELO NO se resetea; season_elo() da el ELO de cada jugador al inicio
 --     y al cierre del mes y la app arma el resumen (campeón = más ELO ganado).
+--   · Notificaciones push: avisan al rival cuando le cargan partidos y cuando
+--     lo desafían. Cada jugador elige qué avisos recibir; los límites de
+--     desafíos (1 cada 10 min por rival, 20 por hora) se controlan acá.
 --   · Racha: victorias seguidas actuales (win_streak) y la mejor histórica
 --     (best_win_streak). Un partido confirmado tarde que es anterior al
 --     último registrado no corta ni alarga la racha actual.
@@ -833,6 +836,191 @@ as $$
   from public.profiles p;
 $$;
 
+-- ---------------------------------------------------------------------
+-- Notificaciones push y desafíos
+-- ---------------------------------------------------------------------
+
+-- Dispositivos que aceptaron notificaciones (una fila por navegador/celular).
+create table if not exists public.push_subscriptions (
+  id          bigint generated always as identity primary key,
+  profile_id  uuid not null references public.profiles (id) on delete cascade,
+  endpoint    text not null unique check (endpoint ~ '^https://' and char_length(endpoint) <= 1000),
+  p256dh      text not null check (char_length(p256dh) <= 200),
+  auth        text not null check (char_length(auth) <= 100),
+  created_at  timestamptz not null default now()
+);
+create index if not exists push_subscriptions_profile_idx on public.push_subscriptions (profile_id);
+
+-- Preferencias de cada jugador. Sin fila = todo activado.
+create table if not exists public.notification_prefs (
+  profile_id     uuid primary key references public.profiles (id) on delete cascade,
+  match_pending  boolean not null default true,
+  challenges     boolean not null default true,
+  updated_at     timestamptz not null default now()
+);
+
+-- Desafíos enviados ("¿jugamos?"). Sirven para avisar y para limitar el spam.
+create table if not exists public.challenges (
+  id             bigint generated always as identity primary key,
+  challenger_id  uuid not null references public.profiles (id) on delete cascade,
+  challenged_id  uuid not null references public.profiles (id) on delete cascade,
+  created_at     timestamptz not null default now(),
+  constraint challenges_not_self check (challenger_id <> challenged_id)
+);
+create index if not exists challenges_challenged_idx on public.challenges (challenged_id, created_at desc);
+create index if not exists challenges_challenger_idx on public.challenges (challenger_id, created_at desc);
+
+alter table public.push_subscriptions enable row level security;
+alter table public.notification_prefs enable row level security;
+alter table public.challenges         enable row level security;
+
+revoke all on public.push_subscriptions, public.notification_prefs, public.challenges from anon, authenticated;
+grant select, delete on public.push_subscriptions to authenticated;
+grant select on public.notification_prefs, public.challenges to authenticated;
+
+drop policy if exists push_subscriptions_select_own on public.push_subscriptions;
+create policy push_subscriptions_select_own on public.push_subscriptions
+  for select to authenticated using (profile_id = (select auth.uid()));
+drop policy if exists push_subscriptions_delete_own on public.push_subscriptions;
+create policy push_subscriptions_delete_own on public.push_subscriptions
+  for delete to authenticated using (profile_id = (select auth.uid()));
+
+drop policy if exists notification_prefs_select_own on public.notification_prefs;
+create policy notification_prefs_select_own on public.notification_prefs
+  for select to authenticated using (profile_id = (select auth.uid()));
+
+drop policy if exists challenges_select_involved on public.challenges;
+create policy challenges_select_involved on public.challenges
+  for select to authenticated
+  using ((select auth.uid()) in (challenger_id, challenged_id));
+
+-- Guarda (o reasigna) el dispositivo actual. Máximo 5 por jugador.
+create or replace function public.save_push_subscription(p_endpoint text, p_p256dh text, p_auth text)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_me uuid := auth.uid();
+begin
+  if v_me is null then
+    raise exception 'Tenés que iniciar sesión.';
+  end if;
+  if not exists (select 1 from public.profiles where id = v_me) then
+    raise exception 'Completá tu perfil primero.';
+  end if;
+
+  -- Un dispositivo que cambia de cuenta deja de pertenecer a la anterior.
+  delete from public.push_subscriptions where endpoint = p_endpoint;
+  insert into public.push_subscriptions (profile_id, endpoint, p256dh, auth)
+  values (v_me, p_endpoint, p_p256dh, p_auth);
+
+  -- Se conservan los 5 dispositivos más recientes.
+  delete from public.push_subscriptions
+   where id in (
+     select id from public.push_subscriptions
+      where profile_id = v_me
+      order by created_at desc, id desc
+      offset 5
+   );
+end;
+$$;
+
+create or replace function public.set_notification_prefs(p_match_pending boolean, p_challenges boolean)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if auth.uid() is null then
+    raise exception 'Tenés que iniciar sesión.';
+  end if;
+  insert into public.notification_prefs (profile_id, match_pending, challenges, updated_at)
+  values (auth.uid(), coalesce(p_match_pending, true), coalesce(p_challenges, true), now())
+  on conflict (profile_id) do update
+    set match_pending = excluded.match_pending,
+        challenges = excluded.challenges,
+        updated_at = now();
+end;
+$$;
+
+-- Dispositivos a avisar cuando cargás partidos contra otros: solo los del
+-- equipo rival de TU serie pendiente, y solo si no desactivaron ese aviso.
+create or replace function public.push_targets_for_batch(p_batch_id uuid)
+returns table (sub_endpoint text, sub_p256dh text, sub_auth text, sub_profile_id uuid)
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select distinct s.endpoint, s.p256dh, s.auth, s.profile_id
+    from public.matches m
+    join public.push_subscriptions s on s.profile_id in (m.opponent_id, m.opponent_partner_id)
+    left join public.notification_prefs np on np.profile_id = s.profile_id
+   where m.batch_id = p_batch_id
+     and m.reporter_id = auth.uid()
+     and m.status = 'pending'
+     and coalesce(np.match_pending, true);
+$$;
+
+-- Registra un desafío (con límites) y devuelve los dispositivos a avisar.
+create or replace function public.send_challenge(p_target uuid)
+returns table (sub_endpoint text, sub_p256dh text, sub_auth text, sub_profile_id uuid)
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_me uuid := auth.uid();
+begin
+  if v_me is null then
+    raise exception 'Tenés que iniciar sesión.';
+  end if;
+  if not exists (select 1 from public.profiles where id = v_me) then
+    raise exception 'Completá tu perfil primero.';
+  end if;
+  if p_target is null or p_target = v_me then
+    raise exception 'Elegí a otro jugador para desafiar.';
+  end if;
+  if not exists (select 1 from public.profiles where id = p_target) then
+    raise exception 'El jugador no existe.';
+  end if;
+  if exists (
+    select 1 from public.challenges
+     where challenger_id = v_me and challenged_id = p_target
+       and created_at > now() - interval '10 minutes'
+  ) then
+    raise exception 'Ya lo desafiaste hace un rato. Dale unos minutos para responder.';
+  end if;
+  if (select count(*) from public.challenges
+       where challenger_id = v_me and created_at > now() - interval '1 hour') >= 20 then
+    raise exception 'Mandaste muchos desafíos en la última hora. Probá más tarde.';
+  end if;
+
+  insert into public.challenges (challenger_id, challenged_id) values (v_me, p_target);
+
+  return query
+    select s.endpoint, s.p256dh, s.auth, s.profile_id
+      from public.push_subscriptions s
+      left join public.notification_prefs np on np.profile_id = s.profile_id
+     where s.profile_id = p_target
+       and coalesce(np.challenges, true);
+end;
+$$;
+
+-- Borra dispositivos que el servicio de push informó como vencidos.
+create or replace function public.prune_push_subscriptions(p_endpoints text[])
+returns void
+language sql
+security definer
+set search_path = ''
+as $$
+  delete from public.push_subscriptions
+   where auth.uid() is not null and endpoint = any (p_endpoints);
+$$;
+
 create or replace function public.is_nickname_available(p_nickname text)
 returns boolean
 language sql
@@ -956,6 +1144,11 @@ revoke execute on function public.confirm_batch(uuid) from public, anon;
 revoke execute on function public.reject_batch(uuid) from public, anon;
 revoke execute on function public.cancel_batch(uuid) from public, anon;
 revoke execute on function public.is_nickname_available(text) from public;
+revoke execute on function public.save_push_subscription(text, text, text) from public, anon;
+revoke execute on function public.set_notification_prefs(boolean, boolean) from public, anon;
+revoke execute on function public.push_targets_for_batch(uuid) from public, anon;
+revoke execute on function public.send_challenge(uuid) from public, anon;
+revoke execute on function public.prune_push_subscriptions(text[]) from public, anon;
 revoke execute on function public.season_elo(timestamptz, timestamptz) from public, anon;
 
 grant execute on function public.apply_inactivity_decay() to authenticated;
@@ -967,6 +1160,11 @@ grant execute on function public.confirm_batch(uuid) to authenticated;
 grant execute on function public.reject_batch(uuid) to authenticated;
 grant execute on function public.cancel_batch(uuid) to authenticated;
 grant execute on function public.is_nickname_available(text) to anon, authenticated;
+grant execute on function public.save_push_subscription(text, text, text) to authenticated;
+grant execute on function public.set_notification_prefs(boolean, boolean) to authenticated;
+grant execute on function public.push_targets_for_batch(uuid) to authenticated;
+grant execute on function public.send_challenge(uuid) to authenticated;
+grant execute on function public.prune_push_subscriptions(text[]) to authenticated;
 grant execute on function public.season_elo(timestamptz, timestamptz) to authenticated;
 
 -- ---------------------------------------------------------------------

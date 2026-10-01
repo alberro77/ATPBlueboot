@@ -9,14 +9,8 @@ type Supabase = Awaited<ReturnType<typeof createClient>>;
 
 /** Todo lo que muestra un perfil: partidos confirmados, posición y días en el #1. */
 export async function loadProfileData(supabase: Supabase, playerId: string) {
-  const [{ data: matchData }, { data: rankedData }, { data: reignData }, { data: eventData }] = await Promise.all([
-    supabase
-      .from("matches")
-      .select(MATCH_FIELDS)
-      .eq("status", "confirmed")
-      .or(involving(playerId))
-      .order("created_at", { ascending: false })
-      .limit(500),
+  const [matchData, { data: rankedData }, { data: reignData }, { data: eventData }] = await Promise.all([
+    fetchAllConfirmed(supabase, playerId),
     supabase
       .from("profiles")
       .select("id")
@@ -37,7 +31,7 @@ export async function loadProfileData(supabase: Supabase, playerId: string) {
   const ranked = (rankedData ?? []) as { id: string }[];
   const reigns = (reignData ?? []) as Reign[];
   return {
-    matches: (matchData ?? []) as unknown as MatchWithPlayers[],
+    matches: matchData,
     position: ranked.findIndex((p) => p.id === playerId) + 1,
     rankedCount: ranked.length,
     daysAtTop: reignDays(reigns),
@@ -54,4 +48,24 @@ function toEloPoints(events: EloEvent[]): EloPoint[] {
     { t: first.created_at, elo: first.elo_after - first.delta, delta: 0, kind: "start", mode: null },
     ...events.map((e) => ({ t: e.created_at, elo: e.elo_after, delta: e.delta, kind: e.kind, mode: e.mode })),
   ];
+}
+
+const PAGE = 1000; // máximo de filas por consulta de la API
+
+/** Todos los partidos confirmados del jugador, del más nuevo al más viejo. */
+async function fetchAllConfirmed(supabase: Supabase, playerId: string) {
+  const all: MatchWithPlayers[] = [];
+  for (let from = 0; ; from += PAGE) {
+    const { data } = await supabase
+      .from("matches")
+      .select(MATCH_FIELDS)
+      .eq("status", "confirmed")
+      .or(involving(playerId))
+      .order("created_at", { ascending: false })
+      .order("id")
+      .range(from, from + PAGE - 1);
+    const rows = (data ?? []) as unknown as MatchWithPlayers[];
+    all.push(...rows);
+    if (rows.length < PAGE) return all;
+  }
 }
