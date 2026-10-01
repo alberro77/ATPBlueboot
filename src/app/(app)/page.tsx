@@ -150,7 +150,7 @@ function OnFireStrip({ players, currentUserId }: { players: Profile[]; currentUs
       <ul className="-mx-4 flex gap-4 overflow-x-auto px-4 pb-1">
         {players.map((p) => (
           <li key={p.id} className="shrink-0">
-            <Link
+            <Link prefetch={false}
               href={playerHref(p.id, currentUserId)}
               className="flex w-16 flex-col items-center gap-1.5 text-center transition-transform active:scale-95"
             >
@@ -173,7 +173,7 @@ function OnFireStrip({ players, currentUserId }: { players: Profile[]; currentUs
 function SeasonLink() {
   const key = seasonKeyAt(nowMs());
   return (
-    <Link
+    <Link prefetch={false}
       href={`/temporadas/${key}`}
       className="mb-5 flex items-center gap-3 rounded-2xl border bg-card p-3 shadow-sm transition-all hover:border-primary/40 active:scale-[0.99]"
     >

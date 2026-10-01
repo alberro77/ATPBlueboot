@@ -16,6 +16,11 @@ const nextConfig: NextConfig = {
         ],
       },
       {
+        // Íconos de la app: el dispositivo los guarda una semana en lugar de pedirlos siempre.
+        source: "/icons/:path*",
+        headers: [{ key: "Cache-Control", value: "public, max-age=604800, stale-while-revalidate=86400" }],
+      },
+      {
         // El service worker siempre tiene que revalidarse para que las actualizaciones lleguen.
         source: "/sw.js",
         headers: [

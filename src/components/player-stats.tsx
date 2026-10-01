@@ -168,7 +168,7 @@ function RelationCard({
         </span>
         {relation ? (
           <>
-            <Link
+            <Link prefetch={false}
               href={playerHref(relation.player.id, viewerId)}
               className="flex w-full min-w-0 flex-col items-center gap-2 rounded-xl transition-opacity hover:opacity-80"
             >

@@ -111,7 +111,7 @@ export default async function MyMatchesPage() {
                 key={player.id}
                 className="flex items-center gap-3 rounded-2xl border border-primary/30 bg-accent/50 p-3 shadow-sm"
               >
-                <Link href={playerHref(player.id, me.id)} className="flex min-w-0 flex-1 items-center gap-3">
+                <Link prefetch={false} href={playerHref(player.id, me.id)} className="flex min-w-0 flex-1 items-center gap-3">
                   <PlayerAvatar player={player} size={44} />
                   <span className="min-w-0">
                     <span className="block truncate text-sm font-bold">{player.nickname} te desafió</span>

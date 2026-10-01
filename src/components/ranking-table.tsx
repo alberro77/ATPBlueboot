@@ -31,7 +31,7 @@ export function Podium({
         if (!player) return <div key={index} />;
         const medal = MEDAL[index];
         return (
-          <Link
+          <Link prefetch={false}
             key={player.id}
             href={playerHref(player.id, currentUserId)}
             className="flex min-w-0 flex-col items-center text-center transition-transform active:scale-[0.97]"
@@ -92,7 +92,7 @@ export function RankingTable({
         const isMe = p.id === currentUserId;
         return (
           <li key={p.id}>
-            <Link
+            <Link prefetch={false}
               href={playerHref(p.id, currentUserId)}
               className={cn(
                 "flex items-center gap-3 rounded-2xl border bg-card p-3 shadow-sm shadow-primary/5 transition-all hover:border-primary/40 hover:shadow-md active:scale-[0.99]",

@@ -74,7 +74,7 @@ export function SeasonPodium({ summary, viewerId }: { summary: SeasonSummary; vi
       <div className="grid grid-cols-3 items-end gap-2 rounded-2xl border bg-card px-2 pt-5 pb-4 shadow-sm">
         {slots.map(({ i, p }) =>
           p ? (
-            <Link key={p.player.id} href={playerHref(p.player.id, viewerId)} className="flex min-w-0 flex-col items-center text-center">
+            <Link prefetch={false} key={p.player.id} href={playerHref(p.player.id, viewerId)} className="flex min-w-0 flex-col items-center text-center">
               {i === 0 && <Crown className="mb-1 size-6 fill-amber-400 text-amber-500" />}
               <div className="relative">
                 <PlayerAvatar player={p.player} size={i === 0 ? 68 : 52} className={cn("ring-4", ring[i])} />
@@ -128,7 +128,7 @@ function Highlight({
 
 function PlayerLine({ player, viewerId, detail }: { player: PlayerSummary; viewerId: string; detail: React.ReactNode }) {
   return (
-    <Link href={playerHref(player.id, viewerId)} className="flex min-w-0 items-center gap-2">
+    <Link prefetch={false} href={playerHref(player.id, viewerId)} className="flex min-w-0 items-center gap-2">
       <PlayerAvatar player={player} size={36} />
       <span className="min-w-0">
         <span className="block truncate text-sm font-bold">{name(player, viewerId)}</span>
@@ -202,7 +202,7 @@ export function SeasonHighlights({ summary, viewerId }: { summary: SeasonSummary
 
 function PlayerSide({ player, wins, viewerId }: { player: PlayerSummary; wins: number; viewerId: string }) {
   return (
-    <Link href={playerHref(player.id, viewerId)} className="flex min-w-0 flex-col items-center gap-1">
+    <Link prefetch={false} href={playerHref(player.id, viewerId)} className="flex min-w-0 flex-col items-center gap-1">
       <PlayerAvatar player={player} size={40} />
       <span className="w-full truncate text-xs font-semibold">{name(player, viewerId)}</span>
       <span className="text-xl leading-none font-extrabold tabular-nums">{wins}</span>
@@ -252,7 +252,7 @@ export function SeasonTable({ summary, viewerId }: { summary: SeasonSummary; vie
           const qualified = p.games >= MIN_MATCHES_TO_RANK;
           return (
             <li key={p.player.id}>
-              <Link
+              <Link prefetch={false}
                 href={playerHref(p.player.id, viewerId)}
                 className={cn("flex items-center gap-3 px-3 py-2.5", p.player.id === viewerId && "bg-accent/50")}
               >

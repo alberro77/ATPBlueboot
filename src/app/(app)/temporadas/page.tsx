@@ -31,7 +31,7 @@ export default async function SeasonsPage() {
         description="Cada mes es una temporada. El ELO sigue de largo; el campeón es quien más ELO suma en el mes."
       />
 
-      <Link
+      <Link prefetch={false}
         href={`/temporadas/${live.key}`}
         className="bg-brand relative overflow-hidden rounded-3xl p-5 text-white shadow-lg shadow-primary/25 transition-transform active:scale-[0.99]"
       >
@@ -83,7 +83,7 @@ export default async function SeasonsPage() {
 function PastSeason({ summary }: { summary: SeasonSummary }) {
   const champ = summary.champion;
   return (
-    <Link
+    <Link prefetch={false}
       href={`/temporadas/${summary.key}`}
       className="flex items-center gap-3 rounded-2xl border bg-card p-3 shadow-sm transition-all hover:border-primary/40 active:scale-[0.99]"
     >
