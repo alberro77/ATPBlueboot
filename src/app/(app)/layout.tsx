@@ -22,13 +22,13 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   return (
     <>
-      <header className="sticky top-0 z-40 border-b bg-background/95 backdrop-blur">
-        <div className="mx-auto flex h-14 max-w-5xl items-center justify-between gap-4 px-4">
-          <Link href="/" className="flex items-center gap-2">
-            <BlueBootIcon className="size-8" />
+      <header className="bg-brand sticky top-0 z-40 text-white shadow-md shadow-primary/20">
+        <div className="mx-auto flex h-15 max-w-5xl items-center justify-between gap-4 px-4">
+          <Link href="/" className="flex items-center gap-2.5">
+            <BlueBootIcon inverted className="size-9" />
             <span className="leading-tight">
-              <span className="block text-sm font-bold">Ping Pong</span>
-              <span className="block text-[0.65rem] font-medium tracking-widest text-primary">BLUEBOOT</span>
+              <span className="block text-base font-bold">Ping Pong</span>
+              <span className="block text-[0.65rem] font-semibold tracking-[0.2em] text-white/75">BLUEBOOT</span>
             </span>
           </Link>
           <DesktopNav pendingCount={pendingCount} />

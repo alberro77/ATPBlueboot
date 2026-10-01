@@ -1,12 +1,14 @@
 import type { Metadata } from "next";
-import { Clock, Hourglass, Inbox, TrendingDown } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { EmptyState, PageHeader } from "@/components/page-header";
+import Link from "next/link";
+import { Clock, Flame, Hourglass, Inbox, PartyPopper, Plus, TrendingDown, Trophy } from "lucide-react";
+import { buttonVariants } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { EmptyState, PageHeader, SectionTitle } from "@/components/page-header";
 import { CancelButton, ConfirmRejectButtons } from "@/components/match-actions";
-import { ModeBadge, MyMatchRow, perspective, TeamAvatars, teamName } from "@/components/match-views";
+import { DeltaPill, ModeBadge, MyMatchRow, perspective, TeamAvatars, teamName } from "@/components/match-views";
 import { getSession, involving, MATCH_FIELDS } from "@/lib/data";
 import { eloDelta, MIN_MATCHES_TO_RANK } from "@/lib/elo";
-import { daysAgoIso, formatDate, fullName, signed } from "@/lib/format";
+import { daysAgoIso, formatDate } from "@/lib/format";
 import { MODE_LABEL, statsFor } from "@/lib/modes";
 import { createClient } from "@/lib/supabase/server";
 import type { EloEvent, MatchWithPlayers, Mode, PlayerSummary, Profile } from "@/lib/types";
@@ -50,19 +52,26 @@ export default async function MyMatchesPage() {
     .filter((d) => d.points > 0);
 
   return (
-    <div className="mx-auto grid max-w-2xl gap-6">
-      <PageHeader title="Mis partidos" />
+    <div className="mx-auto grid max-w-2xl gap-7">
+      <PageHeader
+        title="Mis partidos"
+        action={
+          <Link href="/cargar" className={cn(buttonVariants({ size: "lg" }), "bg-brand hidden sm:inline-flex")}>
+            <Plus /> Cargar
+          </Link>
+        }
+      />
 
       <div className="grid gap-3 sm:grid-cols-2">
-        <StatsCard profile={me} mode="singles" />
-        <StatsCard profile={me} mode="doubles" />
+        <StatsCard profile={me} mode="singles" matches={history} />
+        <StatsCard profile={me} mode="doubles" matches={history} />
       </div>
 
       {decayByMode.length > 0 && (
-        <div className="flex items-start gap-3 rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm">
-          <TrendingDown className="mt-0.5 size-4 shrink-0 text-destructive" />
+        <div className="flex items-start gap-3 rounded-2xl border border-destructive/30 bg-destructive/5 p-4 text-sm">
+          <TrendingDown className="mt-0.5 size-5 shrink-0 text-destructive" />
           <div>
-            <p className="font-medium">Penalización por inactividad (últimos 30 días)</p>
+            <p className="font-semibold">Penalización por inactividad (últimos 30 días)</p>
             {decayByMode.map((d) => (
               <p key={d.mode} className="text-muted-foreground">
                 {MODE_LABEL[d.mode]}: −{d.points} puntos.
@@ -78,7 +87,9 @@ export default async function MyMatchesPage() {
           Para confirmar
         </SectionTitle>
         {toConfirm.length === 0 ? (
-          <EmptyState>No tenés partidos pendientes de confirmación.</EmptyState>
+          <EmptyState icon={PartyPopper} title="¡Estás al día!">
+            Cuando alguien cargue un partido contra vos, lo vas a ver acá para confirmarlo.
+          </EmptyState>
         ) : (
           toConfirm.map((m) => <IncomingMatchCard key={m.id} match={m} me={me} />)
         )}
@@ -89,7 +100,7 @@ export default async function MyMatchesPage() {
           <SectionTitle icon={Hourglass} count={awaiting.length}>
             Esperando al rival
           </SectionTitle>
-          <ul className="divide-y rounded-xl border bg-card">
+          <ul className="divide-y overflow-hidden rounded-2xl border bg-card shadow-sm">
             {awaiting.map((m) => (
               <MyMatchRow
                 key={m.id}
@@ -105,9 +116,19 @@ export default async function MyMatchesPage() {
       <section className="grid gap-3">
         <SectionTitle icon={Clock}>Mi historial</SectionTitle>
         {history.length === 0 ? (
-          <EmptyState>Todavía no jugaste partidos.</EmptyState>
+          <EmptyState
+            icon={Trophy}
+            title="Todavía no jugaste"
+            action={
+              <Link href="/cargar" className={buttonVariants()}>
+                <Plus /> Cargar mi primer partido
+              </Link>
+            }
+          >
+            Jugá un partido y cargalo: tu historial y tu ELO aparecen acá.
+          </EmptyState>
         ) : (
-          <ul className="divide-y rounded-xl border bg-card">
+          <ul className="divide-y overflow-hidden rounded-2xl border bg-card shadow-sm">
             {history.map((m) => (
               <MyMatchRow key={m.id} match={m} playerId={me.id} />
             ))}
@@ -118,52 +139,89 @@ export default async function MyMatchesPage() {
   );
 }
 
-function SectionTitle({
-  icon: Icon,
-  count,
-  children,
-}: {
-  icon: React.ComponentType<{ className?: string }>;
-  count?: number;
-  children: React.ReactNode;
-}) {
+/** Últimos resultados confirmados y racha actual en una modalidad. */
+function recentForm(matches: MatchWithPlayers[], playerId: string, mode: Mode) {
+  const results = matches
+    .filter((m) => m.status === "confirmed" && m.mode === mode)
+    .sort((a, b) => (b.resolved_at ?? b.created_at).localeCompare(a.resolved_at ?? a.created_at))
+    .map((m) => perspective(m, playerId).won);
+  let streak = 0;
+  while (streak < results.length && results[streak] === results[0]) streak++;
+  return { last: results.slice(0, 5), streak, winning: results[0] === true };
+}
+
+function StatsCard({ profile, mode, matches }: { profile: Profile; mode: Mode; matches: MatchWithPlayers[] }) {
+  const s = statsFor(profile, mode);
+  const ranked = s.played >= MIN_MATCHES_TO_RANK;
+  const form = recentForm(matches, profile.id, mode);
+  const winRate = s.played > 0 ? Math.round((s.wins / s.played) * 100) : null;
+
   return (
-    <h2 className="flex items-center gap-2 text-base font-semibold">
-      <Icon className="size-4 text-primary" />
-      {children}
-      {count !== undefined && count > 0 && (
-        <span className="rounded-full bg-primary px-2 text-xs leading-5 text-primary-foreground">{count}</span>
-      )}
-    </h2>
+    <Card className="gap-3 py-4">
+      <CardContent className="grid gap-3 px-4">
+        <div className="flex items-center justify-between">
+          <span className="text-xs font-bold text-muted-foreground uppercase">{MODE_LABEL[mode]}</span>
+          {ranked ? (
+            <span className="rounded-full bg-accent px-2 py-0.5 text-[0.7rem] font-semibold text-accent-foreground">
+              Clasificado
+            </span>
+          ) : (
+            <span className="text-[0.7rem] text-muted-foreground">
+              {s.played}/{MIN_MATCHES_TO_RANK} para clasificar
+            </span>
+          )}
+        </div>
+        <div className="flex items-end justify-between">
+          <div>
+            <div className="text-3xl leading-none font-extrabold tabular-nums text-primary">{s.elo}</div>
+            <div className="mt-1 text-xs text-muted-foreground">ELO</div>
+          </div>
+          <div className="flex gap-4 text-center">
+            <Stat label="PJ" value={s.played} />
+            <Stat label="V" value={s.wins} className="text-success" />
+            <Stat label="D" value={s.losses} className="text-destructive" />
+            {winRate !== null && <Stat label="Efect." value={`${winRate}%`} />}
+          </div>
+        </div>
+        {form.last.length > 0 && (
+          <div className="flex items-center justify-between border-t pt-3">
+            <div className="flex items-center gap-1" aria-label="Últimos resultados">
+              {form.last.map((won, i) => (
+                <span
+                  key={i}
+                  className={cn(
+                    "flex size-5 items-center justify-center rounded-full text-[0.6rem] font-bold text-white",
+                    won ? "bg-success" : "bg-destructive",
+                  )}
+                >
+                  {won ? "V" : "D"}
+                </span>
+              ))}
+            </div>
+            {form.streak >= 2 && (
+              <span
+                className={cn(
+                  "flex items-center gap-1 text-xs font-semibold",
+                  form.winning ? "text-orange-500" : "text-muted-foreground",
+                )}
+              >
+                {form.winning && <Flame className="size-3.5 fill-orange-400" />}
+                {form.streak} {form.winning ? "victorias" : "derrotas"} seguidas
+              </span>
+            )}
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 
-function StatsCard({ profile, mode }: { profile: Profile; mode: Mode }) {
-  const s = statsFor(profile, mode);
-  const ranked = s.played >= MIN_MATCHES_TO_RANK;
-  const stats = [
-    { label: "ELO", value: s.elo, className: "text-primary" },
-    { label: "PJ", value: s.played },
-    { label: "V", value: s.wins, className: "text-success" },
-    { label: "D", value: s.losses, className: "text-destructive" },
-  ];
+function Stat({ label, value, className }: { label: string; value: number | string; className?: string }) {
   return (
-    <Card size="sm">
-      <p className="px-4 text-xs font-semibold text-muted-foreground uppercase">{MODE_LABEL[mode]}</p>
-      <CardContent className="grid grid-cols-4 divide-x text-center">
-        {stats.map((st) => (
-          <div key={st.label}>
-            <div className={cn("text-2xl font-bold tabular-nums", st.className)}>{st.value}</div>
-            <div className="text-xs text-muted-foreground">{st.label}</div>
-          </div>
-        ))}
-      </CardContent>
-      {!ranked && (
-        <p className="px-4 text-center text-xs text-muted-foreground">
-          Sin clasificar: te faltan {MIN_MATCHES_TO_RANK - s.played} partido(s) para el ranking oficial.
-        </p>
-      )}
-    </Card>
+    <div>
+      <div className={cn("text-base leading-none font-bold tabular-nums", className)}>{value}</div>
+      <div className="mt-1 text-[0.7rem] text-muted-foreground">{label}</div>
+    </div>
   );
 }
 
@@ -178,48 +236,55 @@ function IncomingMatchCard({ match, me }: { match: MatchWithPlayers; me: Profile
   const mine = teamElo(myTeam, match.mode);
   const theirs = teamElo(p.rivals, match.mode);
   const preview = p.won ? eloDelta(mine, theirs) : -eloDelta(theirs, mine);
-  const reporter = match.reporter;
   const doubles = match.mode === "doubles";
+  const reporter = match.reporter.nickname;
 
   return (
-    <Card className="border-primary/40 ring-2 ring-primary/10">
-      <CardHeader className="flex flex-row items-center gap-3">
-        <TeamAvatars players={p.rivals} size="lg" />
-        <div className="min-w-0">
-          <CardTitle className="flex items-center gap-2 text-base">
-            <span className="truncate">{teamName(p.rivals)}</span>
-            <ModeBadge mode={match.mode} />
-          </CardTitle>
-          <p className="truncate text-xs text-muted-foreground">
-            {doubles ? `Cargado por ${reporter.nickname}` : fullName(reporter)} · {formatDate(match.created_at)}
+    <Card className="gap-4 border-primary/30 py-4 shadow-md ring-2 ring-primary/10">
+      <CardContent className="grid gap-4 px-4">
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-sm">
+            <b>{reporter}</b> {doubles ? "cargó un partido de dobles" : "cargó un partido"}
           </p>
-        </div>
-      </CardHeader>
-      <CardContent className="grid gap-4">
-        <div className="grid grid-cols-[1fr_auto_1fr] items-center rounded-xl bg-muted/60 p-3 text-center">
-          <div className="min-w-0">
-            <div className="truncate text-xs text-muted-foreground">
-              {p.partner ? `Vos & ${p.partner.nickname}` : "Vos"}
-            </div>
-            <div className={cn("text-3xl font-bold tabular-nums", p.won && "text-success")}>{p.myScore}</div>
-          </div>
-          <span className="px-3 text-xl text-muted-foreground">–</span>
-          <div className="min-w-0">
-            <div className="truncate text-xs text-muted-foreground">{teamName(p.rivals)}</div>
-            <div className={cn("text-3xl font-bold tabular-nums", !p.won && "text-success")}>{p.rivalScore}</div>
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <ModeBadge mode={match.mode} />
+            {formatDate(match.created_at)}
           </div>
         </div>
-        <p className="text-center text-sm text-muted-foreground">
-          Si confirmás:{" "}
-          <b className={preview >= 0 ? "text-success" : "text-destructive"}>
-            {signed(preview)} ELO{doubles && " para cada uno"}
-          </b>
-          {doubles && p.partner && (
-            <span className="block text-xs">Alcanza con que confirme uno de los dos ({p.partner.nickname} también puede).</span>
-          )}
+
+        <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 rounded-2xl bg-muted/60 p-3 text-center">
+          <TeamResult players={myTeam} label={p.partner ? `Vos & ${p.partner.nickname}` : "Vos"} won={p.won} />
+          <span className="text-xs font-black text-muted-foreground">VS</span>
+          <TeamResult players={p.rivals} label={teamName(p.rivals)} won={!p.won} />
+        </div>
+
+        <p className="text-center text-sm">
+          {p.won ? "¿Ganaste?" : "¿Perdiste?"} Si confirmás:{" "}
+          <DeltaPill delta={preview} suffix={doubles ? " ELO c/u" : " ELO"} />
         </p>
+        {doubles && p.partner && (
+          <p className="-mt-2 text-center text-xs text-muted-foreground">
+            Alcanza con que confirme uno de los dos ({p.partner.nickname} también puede).
+          </p>
+        )}
         <ConfirmRejectButtons matchId={match.id} />
       </CardContent>
     </Card>
+  );
+}
+
+function TeamResult({ players, label, won }: { players: PlayerSummary[]; label: string; won: boolean }) {
+  return (
+    <div className={cn("flex min-w-0 flex-col items-center gap-1.5", !won && "opacity-60")}>
+      <TeamAvatars players={players} size="lg" />
+      <span className="w-full truncate text-sm font-semibold">{label}</span>
+      {won ? (
+        <span className="flex items-center gap-1 rounded-full bg-amber-400 px-2 py-0.5 text-[0.65rem] font-bold text-amber-950 uppercase">
+          <Trophy className="size-3" /> Ganó
+        </span>
+      ) : (
+        <span className="text-[0.65rem] font-semibold text-muted-foreground uppercase">Perdió</span>
+      )}
+    </div>
   );
 }

@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, Trophy } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
 import { EmptyState, PageHeader } from "@/components/page-header";
 import { MatchRow } from "@/components/match-views";
@@ -59,9 +59,9 @@ export default async function HistoryPage({ searchParams }: PageProps<"/historia
         />
       </div>
       {matches.length === 0 ? (
-        <EmptyState>Todavía no hay partidos confirmados.</EmptyState>
+        <EmptyState icon={Trophy} title="Todavía no hay partidos">Cuando se confirme el primero, aparece acá.</EmptyState>
       ) : (
-        <ul className="divide-y rounded-xl border bg-card">
+        <ul className="divide-y overflow-hidden rounded-2xl border bg-card shadow-sm">
           {matches.map((m) => (
             <MatchRow key={m.id} match={m} />
           ))}

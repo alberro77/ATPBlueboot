@@ -10,16 +10,11 @@ function done(message?: string): ActionResult {
   return { ok: true, message };
 }
 
-export async function reportMatch(input: {
-  opponentId: string;
-  myScore: number;
-  opponentScore: number;
-}): Promise<ActionResult> {
+export async function reportMatch(input: { opponentId: string; iWon: boolean }): Promise<ActionResult> {
   const supabase = await createClient();
   const { error } = await supabase.rpc("report_match", {
     p_opponent_id: input.opponentId,
-    p_my_score: input.myScore,
-    p_opponent_score: input.opponentScore,
+    p_i_won: input.iWon,
   });
   if (error) return { ok: false, error: error.message };
   return done("Partido cargado. Queda pendiente hasta que tu rival lo confirme.");
@@ -29,16 +24,14 @@ export async function reportDoublesMatch(input: {
   partnerId: string;
   opponentId: string;
   opponentPartnerId: string;
-  myScore: number;
-  opponentScore: number;
+  weWon: boolean;
 }): Promise<ActionResult> {
   const supabase = await createClient();
   const { error } = await supabase.rpc("report_doubles_match", {
     p_partner_id: input.partnerId,
     p_opponent_id: input.opponentId,
     p_opponent_partner_id: input.opponentPartnerId,
-    p_my_score: input.myScore,
-    p_opponent_score: input.opponentScore,
+    p_we_won: input.weWon,
   });
   if (error) return { ok: false, error: error.message };
   return done("Partido de dobles cargado. Cualquiera de los dos rivales puede confirmarlo.");

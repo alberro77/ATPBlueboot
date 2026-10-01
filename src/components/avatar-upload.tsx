@@ -64,8 +64,7 @@ export function AvatarUpload({
       <div className="flex items-center gap-3">
         <PlayerAvatar
           player={{ ...name, first_name: name.first_name || "?", avatar_url: url || null }}
-          size="lg"
-          className="size-14"
+          size={56}
         />
         <input
           ref={inputRef}

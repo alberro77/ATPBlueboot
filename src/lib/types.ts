@@ -36,8 +36,11 @@ export type Match = {
   reporter_partner_id: string | null;
   opponent_id: string;
   opponent_partner_id: string | null;
-  reporter_score: number;
-  opponent_score: number;
+  /** true si ganó el equipo A (quien cargó el partido). */
+  reporter_won: boolean;
+  /** Marcador: solo en partidos cargados con la versión anterior. */
+  reporter_score: number | null;
+  opponent_score: number | null;
   winner_id: string;
   status: MatchStatus;
   reporter_elo_before: number | null;

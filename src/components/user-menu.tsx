@@ -20,10 +20,16 @@ export function UserMenu({ profile }: { profile: Profile }) {
     <DropdownMenu>
       <DropdownMenuTrigger
         aria-label="Menú de usuario"
-        className="flex items-center gap-2 rounded-full p-0.5 pr-2 outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50"
+        className="flex items-center gap-2 rounded-full bg-white/10 p-0.5 pr-3 outline-none transition-colors hover:bg-white/20 focus-visible:ring-3 focus-visible:ring-white/50"
       >
-        <PlayerAvatar player={profile} />
-        <span className="text-sm font-semibold tabular-nums text-primary">{profile.elo}</span>
+        <PlayerAvatar player={profile} className="ring-2 ring-white/70" />
+        <span className="text-left leading-none">
+          <span className="block text-[0.6rem] font-medium text-white/70">ELO 1v1 · 2v2</span>
+          <span className="block text-sm font-bold tabular-nums">
+            {profile.elo}
+            <span className="font-medium text-white/60"> · {profile.elo_doubles}</span>
+          </span>
+        </span>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-52">
         <DropdownMenuGroup>

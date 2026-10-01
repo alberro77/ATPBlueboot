@@ -4,9 +4,9 @@ Ranking ELO de ping pong de BlueBoot. Mobile-first, hecho con Next.js 16 (App Ro
 
 ## Funcionalidades
 
-- **Ranking**: selector **Singles (1v1) / Dobles (2v2)**, cada uno con su ranking oficial (3+ partidos confirmados en esa modalidad) y su pestaña "Sin clasificar". Muestra avatar o iniciales, apodo, nombre, ELO, PJ y V/D.
-- **Cargar partido**: elegís modalidad; en 1v1 el rival, en 2v2 tu compañero y los dos rivales. Cargás el marcador y ves cuántos puntos ganarías o perderías.
-- **Mis partidos**: estadísticas de ambas modalidades, partidos que te toca confirmar o rechazar, los que esperan al rival (los podés cancelar si los cargaste vos) y tu historial.
+- **Ranking**: selector **Singles (1v1) / Dobles (2v2)**, tarjeta con tu posición, podio para el top 3 y tabla con el resto. Cada modalidad tiene su ranking oficial (3+ partidos confirmados) y su pestaña "Sin clasificar" con el progreso hacia los 3 partidos.
+- **Cargar partido**: en 3 pasos y sin marcador: modalidad → jugadores (buscador con fotos y rivales recientes) → **¿Quién ganó?** tocando la tarjeta del equipo ganador. Muestra cuántos puntos se ganan o pierden antes de enviar.
+- **Mis partidos**: estadísticas de ambas modalidades (ELO, PJ, V/D, efectividad, últimos 5 resultados y racha), partidos para confirmar o rechazar, los que esperan al rival (los podés cancelar si los cargaste vos) y tu historial.
 - **App instalable (PWA)**: desde el celular se puede agregar a la pantalla de inicio y abre a pantalla completa. En Android/Chrome aparece un botón "Instalar"; en iPhone, la app muestra cómo hacerlo (Compartir → Agregar a inicio).
 - **Historial**: todos los partidos confirmados de la empresa, paginados.
 - **Perfil**: nombre, apellido, apodo y foto. La foto se recorta en cuadrado y se comprime a 256×256 WebP (~30 KB) en el navegador antes de subirse a Supabase Storage; el bucket rechaza archivos de más de 512 KB o que no sean imágenes.
@@ -22,7 +22,7 @@ Todas viven en la base de datos (`supabase/schema.sql`), en funciones `security 
 | Doble validación | `report_match()` / `report_doubles_match()` crean el partido como `pending`. Confirma o rechaza el rival; en dobles alcanza con cualquiera de los dos integrantes del equipo rival. El ELO cambia recién al confirmar |
 | Mínimo 3 partidos | 3+ partidos confirmados **en esa modalidad** para entrar a su ranking oficial |
 | Decay por inactividad | Por modalidad. Clasificado con 7+ días sin partidos confirmados en esa modalidad: −10 por cada semana de inactividad (a los 7 días, −10; a los 14, −20 acumulado; etc.). Lo aplica `apply_inactivity_decay()` a diario vía `pg_cron` y también cada vez que se abre el ranking. Es idempotente |
-| Marcador válido | Sin empates, el ganador llega al menos a 11 y gana por 2 o más puntos de diferencia |
+| Resultado | Solo se carga quién ganó (`reporter_won`); el marcador no se pide. Los partidos cargados antes con marcador lo conservan y se sigue mostrando |
 
 ## Puesta en marcha
 

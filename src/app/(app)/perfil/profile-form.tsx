@@ -18,7 +18,7 @@ export function ProfileForm({ profile }: { profile: Profile }) {
       <Card>
         <CardContent>
           <div className="mb-5 flex items-center gap-4">
-            <PlayerAvatar player={profile} size="lg" className="size-16" />
+            <PlayerAvatar player={profile} size={64} />
             <div>
               <div className="text-lg font-bold">{profile.nickname}</div>
               <div className="text-sm text-muted-foreground">

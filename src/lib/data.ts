@@ -6,7 +6,7 @@ export const PLAYER_FIELDS = "id, nickname, first_name, last_name, avatar_url, e
 
 export const MATCH_FIELDS = `
   id, mode, reporter_id, reporter_partner_id, opponent_id, opponent_partner_id,
-  reporter_score, opponent_score, winner_id, status, elo_delta, confirmed_by,
+  reporter_won, reporter_score, opponent_score, winner_id, status, elo_delta, confirmed_by,
   reporter_elo_before, reporter_partner_elo_before, opponent_elo_before, opponent_partner_elo_before,
   created_at, resolved_at,
   reporter:profiles!matches_reporter_id_fkey(${PLAYER_FIELDS}),

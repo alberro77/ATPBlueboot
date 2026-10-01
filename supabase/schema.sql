@@ -68,16 +68,18 @@ create index if not exists profiles_elo_doubles_idx on public.profiles (elo_doub
 
 -- Equipo A = reporter_id (+ reporter_partner_id en dobles): quien carga el partido.
 -- Equipo B = opponent_id (+ opponent_partner_id en dobles): quien confirma.
--- reporter_score / opponent_score son los puntos de cada equipo.
+-- reporter_won indica qué equipo ganó. Solo se carga ganador/perdedor; los
+-- marcadores (reporter_score / opponent_score) quedan de partidos viejos y son opcionales.
 create table if not exists public.matches (
   id                  uuid primary key default gen_random_uuid(),
   reporter_id         uuid not null references public.profiles (id) on delete cascade,
   opponent_id         uuid not null references public.profiles (id) on delete cascade,
-  reporter_score      smallint not null check (reporter_score between 0 and 99),
-  opponent_score      smallint not null check (opponent_score between 0 and 99),
+  reporter_won        boolean not null,
+  reporter_score      smallint check (reporter_score between 0 and 99),
+  opponent_score      smallint check (opponent_score between 0 and 99),
   -- Jugador 1 del equipo ganador.
   winner_id           uuid generated always as (
-                        case when reporter_score > opponent_score then reporter_id else opponent_id end
+                        case when reporter_won then reporter_id else opponent_id end
                       ) stored,
   status              public.match_status not null default 'pending',
   -- Snapshot al confirmar: ELO previo de cada uno (de la modalidad) y puntos transferidos.
@@ -86,9 +88,30 @@ create table if not exists public.matches (
   elo_delta           integer,
   created_at          timestamptz not null default now(),
   resolved_at         timestamptz,
-  constraint matches_different_players check (reporter_id <> opponent_id),
-  constraint matches_no_tie check (reporter_score <> opponent_score)
+  constraint matches_different_players check (reporter_id <> opponent_id)
 );
+
+-- Migración desde la versión con marcador obligatorio.
+alter table public.matches add column if not exists reporter_won boolean;
+update public.matches set reporter_won = reporter_score > opponent_score where reporter_won is null;
+alter table public.matches alter column reporter_won set not null;
+alter table public.matches alter column reporter_score drop not null;
+alter table public.matches alter column opponent_score drop not null;
+alter table public.matches drop constraint if exists matches_no_tie;
+
+do $$
+begin
+  if not exists (
+    select 1 from information_schema.columns
+     where table_schema = 'public' and table_name = 'matches'
+       and column_name = 'winner_id' and generation_expression ilike '%reporter_won%'
+  ) then
+    alter table public.matches drop column if exists winner_id;
+    alter table public.matches add column winner_id uuid generated always as (
+      case when reporter_won then reporter_id else opponent_id end
+    ) stored;
+  end if;
+end $$;
 
 alter table public.matches
   add column if not exists mode                        public.match_mode not null default 'singles',
@@ -263,35 +286,14 @@ $$;
 -- Carga de partidos
 -- ---------------------------------------------------------------------
 
-create or replace function private.validate_score(p_a integer, p_b integer)
-returns void
-language plpgsql
-immutable
-set search_path = ''
-as $$
-declare
-  v_hi integer := greatest(p_a, p_b);
-  v_lo integer := least(p_a, p_b);
-begin
-  if p_a is null or p_b is null or p_a not between 0 and 99 or p_b not between 0 and 99 then
-    raise exception 'Los puntajes tienen que estar entre 0 y 99.';
-  end if;
-  if v_hi = v_lo then
-    raise exception 'No puede haber empate.';
-  end if;
-  if v_hi < 11 then
-    raise exception 'El ganador tiene que llegar al menos a 11 puntos.';
-  end if;
-  if v_hi - v_lo < 2 then
-    raise exception 'Se gana por 2 puntos de diferencia.';
-  end if;
-end;
-$$;
+-- Versiones anteriores (con marcador).
+drop function if exists private.validate_score(integer, integer);
+drop function if exists public.report_match(uuid, integer, integer);
+drop function if exists public.report_doubles_match(uuid, uuid, uuid, integer, integer);
 
 create or replace function public.report_match(
-  p_opponent_id    uuid,
-  p_my_score       integer,
-  p_opponent_score integer
+  p_opponent_id uuid,
+  p_i_won       boolean
 )
 returns uuid
 language plpgsql
@@ -314,7 +316,9 @@ begin
   if not exists (select 1 from public.profiles where id = p_opponent_id) then
     raise exception 'El rival no existe.';
   end if;
-  perform private.validate_score(p_my_score, p_opponent_score);
+  if p_i_won is null then
+    raise exception 'Indicá quién ganó.';
+  end if;
 
   if exists (
     select 1 from public.matches
@@ -327,8 +331,8 @@ begin
     raise exception 'Ya cargaste un partido contra este rival hace instantes.';
   end if;
 
-  insert into public.matches (mode, reporter_id, opponent_id, reporter_score, opponent_score)
-  values ('singles', v_me, p_opponent_id, p_my_score, p_opponent_score)
+  insert into public.matches (mode, reporter_id, opponent_id, reporter_won)
+  values ('singles', v_me, p_opponent_id, p_i_won)
   returning id into v_id;
 
   return v_id;
@@ -339,8 +343,7 @@ create or replace function public.report_doubles_match(
   p_partner_id          uuid,
   p_opponent_id         uuid,
   p_opponent_partner_id uuid,
-  p_my_score            integer,
-  p_opponent_score      integer
+  p_we_won              boolean
 )
 returns uuid
 language plpgsql
@@ -366,7 +369,9 @@ begin
   if (select count(*) from public.profiles where id in (p_partner_id, p_opponent_id, p_opponent_partner_id)) <> 3 then
     raise exception 'Alguno de los jugadores no existe.';
   end if;
-  perform private.validate_score(p_my_score, p_opponent_score);
+  if p_we_won is null then
+    raise exception 'Indicá qué equipo ganó.';
+  end if;
 
   if exists (
     select 1 from public.matches
@@ -379,10 +384,10 @@ begin
   end if;
 
   insert into public.matches (
-    mode, reporter_id, reporter_partner_id, opponent_id, opponent_partner_id, reporter_score, opponent_score
+    mode, reporter_id, reporter_partner_id, opponent_id, opponent_partner_id, reporter_won
   )
   values (
-    'doubles', v_me, p_partner_id, p_opponent_id, p_opponent_partner_id, p_my_score, p_opponent_score
+    'doubles', v_me, p_partner_id, p_opponent_id, p_opponent_partner_id, p_we_won
   )
   returning id into v_id;
 
@@ -467,7 +472,7 @@ as $$
 declare
   v_players  uuid[] := array[p_match.reporter_id, p_match.reporter_partner_id,
                              p_match.opponent_id, p_match.opponent_partner_id];
-  v_a_won    boolean := p_match.reporter_score > p_match.opponent_score;
+  v_a_won    boolean := p_match.reporter_won;
   v_winners  uuid[];
   v_a1       integer;
   v_a2       integer;
@@ -666,16 +671,16 @@ revoke execute on function public.handle_new_user() from public, anon, authentic
 revoke execute on all functions in schema private from public, anon, authenticated;
 
 revoke execute on function public.apply_inactivity_decay()                                   from public, anon;
-revoke execute on function public.report_match(uuid, integer, integer)                       from public, anon;
-revoke execute on function public.report_doubles_match(uuid, uuid, uuid, integer, integer)   from public, anon;
+revoke execute on function public.report_match(uuid, boolean) from public, anon;
+revoke execute on function public.report_doubles_match(uuid, uuid, uuid, boolean) from public, anon;
 revoke execute on function public.confirm_match(uuid)                                        from public, anon;
 revoke execute on function public.reject_match(uuid)                                         from public, anon;
 revoke execute on function public.cancel_match(uuid)                                         from public, anon;
 revoke execute on function public.is_nickname_available(text)                                from public;
 
 grant execute on function public.apply_inactivity_decay()                                   to authenticated;
-grant execute on function public.report_match(uuid, integer, integer)                       to authenticated;
-grant execute on function public.report_doubles_match(uuid, uuid, uuid, integer, integer)   to authenticated;
+grant execute on function public.report_match(uuid, boolean) to authenticated;
+grant execute on function public.report_doubles_match(uuid, uuid, uuid, boolean) to authenticated;
 grant execute on function public.confirm_match(uuid)                                        to authenticated;
 grant execute on function public.reject_match(uuid)                                         to authenticated;
 grant execute on function public.cancel_match(uuid)                                         to authenticated;
