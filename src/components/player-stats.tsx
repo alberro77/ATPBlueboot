@@ -84,7 +84,7 @@ export function StatsCard({ profile, matches }: { profile: Profile; matches: Mat
 type Relation = { player: PlayerSummary; games: number; wins: number; losses: number };
 
 /**
- * Clásico rival: con quien más jugaste en contra (1v1 y 2v2).
+ * Clásico rival: con quien más jugaste en contra en 1 vs 1.
  * Compañero: con quien más jugaste del mismo lado en 2v2.
  * Ante un empate gana el más reciente.
  */
@@ -101,7 +101,7 @@ export function computeRelations(matches: MatchWithPlayers[], playerId: string) 
 
   for (const m of [...matches].filter((m) => m.status === "confirmed").sort(byDateDesc)) {
     const p = perspective(m, playerId);
-    p.rivals.forEach((r) => add(rivals, r, p.won));
+    if (m.mode === "singles") add(rivals, p.rivals[0], p.won);
     if (p.partner) add(partners, p.partner, p.won);
   }
 
@@ -114,7 +114,7 @@ export function RelationCards({
   rival,
   partner,
   viewerId,
-  emptyRival = "Todavía no jugaste contra nadie.",
+  emptyRival = "Todavía no jugaste un 1 vs 1.",
   emptyPartner = "Jugá un 2 vs 2 para tener compañero.",
 }: {
   rival: Relation | null;
@@ -129,7 +129,7 @@ export function RelationCards({
         icon={Swords}
         title="Clásico rival"
         relation={rival}
-        detail={(r) => `${r.games} ${r.games === 1 ? "partido" : "partidos"} en contra`}
+        detail={(r) => `${r.games} ${r.games === 1 ? "partido" : "partidos"} 1 vs 1`}
         empty={emptyRival}
         viewerId={viewerId}
       />

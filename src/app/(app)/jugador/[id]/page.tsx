@@ -58,7 +58,7 @@ export default async function PlayerPage({ params }: PageProps<"/jugador/[id]">)
         rival={rival}
         partner={partner}
         viewerId={me.id}
-        emptyRival="Todavía no jugó contra nadie."
+        emptyRival="Todavía no jugó un 1 vs 1."
         emptyPartner="Todavía no jugó 2 vs 2."
       />
 
