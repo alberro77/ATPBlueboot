@@ -6,24 +6,18 @@ export type Profile = {
   last_name: string;
   nickname: string;
   avatar_url: string | null;
-  // Singles (1v1)
+  /** ELO único: suman los partidos de 1v1 y de 2v2. */
   elo: number;
   matches_played: number;
   wins: number;
   losses: number;
   last_match_at: string | null;
-  // Dobles (2v2)
-  elo_doubles: number;
-  doubles_played: number;
-  doubles_wins: number;
-  doubles_losses: number;
-  doubles_last_match_at: string | null;
   created_at: string;
 };
 
 export type PlayerSummary = Pick<
   Profile,
-  "id" | "nickname" | "first_name" | "last_name" | "avatar_url" | "elo" | "elo_doubles"
+  "id" | "nickname" | "first_name" | "last_name" | "avatar_url" | "elo"
 >;
 
 export type MatchStatus = "pending" | "confirmed" | "rejected" | "cancelled";
@@ -63,7 +57,8 @@ export type MatchWithPlayers = Match & {
 export type EloEvent = {
   id: number;
   kind: "match" | "decay";
-  mode: Mode;
+  /** null en las penalizaciones por inactividad. */
+  mode: Mode | null;
   delta: number;
   elo_after: number;
   created_at: string;

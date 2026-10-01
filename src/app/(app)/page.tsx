@@ -1,20 +1,16 @@
 import Link from "next/link";
-import { Info, Plus, Swords, User, Users } from "lucide-react";
+import { Info, Plus, Swords, Users } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { EmptyState, PageHeader } from "@/components/page-header";
 import { PlayerAvatar } from "@/components/player-avatar";
 import { MatchesProgress, Podium, RankingTable } from "@/components/ranking-table";
-import { SegmentedLinks } from "@/components/segmented";
 import { getSession } from "@/lib/data";
 import { MIN_MATCHES_TO_RANK } from "@/lib/elo";
-import { MODE_LABEL, parseMode, statsFor } from "@/lib/modes";
 import { createClient } from "@/lib/supabase/server";
-import type { Mode, Profile } from "@/lib/types";
-import { cn } from "@/lib/utils";
+import type { Profile } from "@/lib/types";
 
-export default async function RankingPage({ searchParams }: PageProps<"/">) {
-  const mode = parseMode((await searchParams).modo) ?? "singles";
+export default async function RankingPage() {
   const { profile } = await getSession();
   const me = profile!;
   const supabase = await createClient();
@@ -22,51 +18,26 @@ export default async function RankingPage({ searchParams }: PageProps<"/">) {
   // Aplica el decay por inactividad pendiente (idempotente; complementa al cron diario).
   await supabase.rpc("apply_inactivity_decay");
 
-  const { data } = await supabase.from("profiles").select("*");
-  const players = ((data ?? []) as Profile[])
-    .map((p) => ({ p, s: statsFor(p, mode) }))
-    .sort((a, b) => b.s.elo - a.s.elo || b.s.wins - a.s.wins || a.p.nickname.localeCompare(b.p.nickname));
+  const { data } = await supabase
+    .from("profiles")
+    .select("*")
+    .order("elo", { ascending: false })
+    .order("wins", { ascending: false })
+    .order("nickname");
+  const players = (data ?? []) as Profile[];
 
-  const ranked = players.filter(({ s }) => s.played >= MIN_MATCHES_TO_RANK).map(({ p }) => p);
+  const ranked = players.filter((p) => p.matches_played >= MIN_MATCHES_TO_RANK);
   const unranked = players
-    .filter(({ s }) => s.played < MIN_MATCHES_TO_RANK)
-    .sort((a, b) => b.s.played - a.s.played || b.s.elo - a.s.elo)
-    .map(({ p }) => p);
-  const modeName = mode === "singles" ? "singles" : "dobles";
-  const cargarHref = mode === "doubles" ? "/cargar?modo=2v2" : "/cargar";
+    .filter((p) => p.matches_played < MIN_MATCHES_TO_RANK)
+    .sort((a, b) => b.matches_played - a.matches_played || b.elo - a.elo);
 
   return (
     <>
-      <PageHeader title="Ranking" description="¿Quién manda en la mesa de BlueBoot?" />
+      <PageHeader title="Ranking" description="1 vs 1 y 2 vs 2 suman al mismo ELO." />
 
-      <div className="mb-4">
-        <SegmentedLinks
-          options={[
-            {
-              href: "/",
-              label: (
-                <>
-                  <User className="size-4" /> {MODE_LABEL.singles}
-                </>
-              ),
-              active: mode === "singles",
-            },
-            {
-              href: "/?modo=2v2",
-              label: (
-                <>
-                  <Users className="size-4" /> {MODE_LABEL.doubles}
-                </>
-              ),
-              active: mode === "doubles",
-            },
-          ]}
-        />
-      </div>
+      <MyPositionCard me={me} ranked={ranked} />
 
-      <MyPositionCard me={me} mode={mode} ranked={ranked} cargarHref={cargarHref} />
-
-      <Tabs key={mode} defaultValue="oficial">
+      <Tabs defaultValue="oficial">
         <TabsList className="h-10 w-full sm:w-auto">
           <TabsTrigger value="oficial" className="px-4">
             Ranking oficial
@@ -79,9 +50,9 @@ export default async function RankingPage({ searchParams }: PageProps<"/">) {
         <TabsContent value="oficial" className="mt-3">
           {ranked.length > 0 ? (
             <>
-              <Podium players={ranked.slice(0, 3)} mode={mode} currentUserId={me.id} />
+              <Podium players={ranked.slice(0, 3)} currentUserId={me.id} />
               {ranked.length > 3 && (
-                <RankingTable players={ranked.slice(3)} startIndex={3} mode={mode} currentUserId={me.id} ranked />
+                <RankingTable players={ranked.slice(3)} startIndex={3} currentUserId={me.id} ranked />
               )}
             </>
           ) : (
@@ -89,12 +60,12 @@ export default async function RankingPage({ searchParams }: PageProps<"/">) {
               icon={Swords}
               title="El ranking está vacío"
               action={
-                <Link href={cargarHref} className={buttonVariants()}>
+                <Link href="/cargar" className={buttonVariants()}>
                   <Plus /> Cargar partido
                 </Link>
               }
             >
-              Todavía nadie tiene {MIN_MATCHES_TO_RANK} partidos confirmados en {modeName}. ¡Andá a la mesa! 🏓
+              Todavía nadie tiene {MIN_MATCHES_TO_RANK} partidos confirmados. ¡Andá a la mesa! 🏓
             </EmptyState>
           )}
         </TabsContent>
@@ -102,42 +73,33 @@ export default async function RankingPage({ searchParams }: PageProps<"/">) {
         <TabsContent value="sin-clasificar" className="mt-3 grid gap-3">
           <p className="flex items-start gap-2 rounded-xl bg-accent/60 p-3 text-sm text-accent-foreground">
             <Info className="mt-0.5 size-4 shrink-0" />
-            Para entrar al ranking oficial de {modeName} hay que jugar al menos {MIN_MATCHES_TO_RANK} partidos
-            confirmados en esa modalidad.
+            Para entrar al ranking oficial hay que jugar al menos {MIN_MATCHES_TO_RANK} partidos confirmados (1 vs 1 o 2
+            vs 2).
           </p>
           {unranked.length > 0 ? (
-            <RankingTable players={unranked} mode={mode} currentUserId={me.id} ranked={false} />
+            <RankingTable players={unranked} currentUserId={me.id} ranked={false} />
           ) : (
             <EmptyState icon={Users}>No hay jugadores sin clasificar.</EmptyState>
           )}
         </TabsContent>
       </Tabs>
       <p className="mt-5 text-center text-xs text-muted-foreground">
-        Singles y dobles tienen ELO independiente. Inactividad: después de 7 días sin jugar en una modalidad se
-        descuentan 10 puntos por semana en esa modalidad.
+        Si pasan 7 días sin jugar, se descuentan 10 puntos por semana.
       </p>
     </>
   );
 }
 
-function MyPositionCard({
-  me,
-  mode,
-  ranked,
-  cargarHref,
-}: {
-  me: Profile;
-  mode: Mode;
-  ranked: Profile[];
-  cargarHref: string;
-}) {
-  const s = statsFor(me, mode);
+function MyPositionCard({ me, ranked }: { me: Profile; ranked: Profile[] }) {
   const position = ranked.findIndex((p) => p.id === me.id) + 1;
   return (
-    <div className="bg-brand mb-5 flex items-center gap-3 rounded-2xl p-4 text-white shadow-lg shadow-primary/25">
+    <Link
+      href="/perfil"
+      className="bg-brand mb-5 flex items-center gap-3 rounded-2xl p-4 text-white shadow-lg shadow-primary/25 transition-transform active:scale-[0.99]"
+    >
       <PlayerAvatar player={me} size={48} className="ring-2 ring-white/70" />
       <div className="min-w-0 flex-1">
-        <p className="text-xs font-medium text-white/75">Tu posición en {mode === "singles" ? "1v1" : "2v2"}</p>
+        <p className="text-xs font-medium text-white/75">Tu posición</p>
         {position > 0 ? (
           <p className="text-2xl leading-tight font-extrabold">
             #{position} <span className="text-sm font-medium text-white/75">de {ranked.length}</span>
@@ -145,23 +107,14 @@ function MyPositionCard({
         ) : (
           <div>
             <p className="text-base leading-tight font-bold">Sin clasificar</p>
-            <MatchesProgress played={s.played} onBrand className="mt-1" />
+            <MatchesProgress played={me.matches_played} onBrand className="mt-1" />
           </div>
         )}
       </div>
       <div className="text-right">
         <p className="text-xs font-medium text-white/75">ELO</p>
-        <p className="text-2xl leading-tight font-extrabold tabular-nums">{s.elo}</p>
+        <p className="text-2xl leading-tight font-extrabold tabular-nums">{me.elo}</p>
       </div>
-      <Link
-        href={cargarHref}
-        aria-label="Cargar partido"
-        className={cn(
-          "hidden size-11 items-center justify-center rounded-full bg-white text-primary shadow-md transition-transform hover:scale-105 sm:flex",
-        )}
-      >
-        <Plus className="size-5" strokeWidth={2.5} />
-      </Link>
-    </div>
+    </Link>
   );
 }

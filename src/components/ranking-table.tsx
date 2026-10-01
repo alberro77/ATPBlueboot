@@ -3,8 +3,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { PlayerAvatar } from "@/components/player-avatar";
 import { fullName } from "@/lib/format";
 import { MIN_MATCHES_TO_RANK } from "@/lib/elo";
-import { statsFor } from "@/lib/modes";
-import type { Mode, Profile } from "@/lib/types";
+import type { Profile } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 const MEDAL = [
@@ -14,13 +13,12 @@ const MEDAL = [
 ];
 
 /** Top 3 en formato podio: 2º · 1º · 3º. */
-export function Podium({ players, mode, currentUserId }: { players: Profile[]; mode: Mode; currentUserId: string }) {
+export function Podium({ players, currentUserId }: { players: Profile[]; currentUserId: string }) {
   const slots = [1, 0, 2].map((i) => ({ index: i, player: players[i] }));
   return (
     <div className="mb-4 grid grid-cols-3 items-end gap-2 rounded-2xl border bg-card px-2 pt-5 shadow-sm">
       {slots.map(({ index, player }) => {
         if (!player) return <div key={index} />;
-        const s = statsFor(player, mode);
         const medal = MEDAL[index];
         return (
           <div key={player.id} className="flex min-w-0 flex-col items-center text-center">
@@ -44,9 +42,9 @@ export function Podium({ players, mode, currentUserId }: { players: Profile[]; m
               {player.nickname}
               {player.id === currentUserId && <span className="text-primary"> ·vos</span>}
             </div>
-            <div className="text-lg leading-tight font-extrabold tabular-nums text-primary">{s.elo}</div>
+            <div className="text-lg leading-tight font-extrabold tabular-nums text-primary">{player.elo}</div>
             <div className="text-[0.7rem] text-muted-foreground tabular-nums">
-              {s.wins}V · {s.losses}D
+              {player.wins}V · {player.losses}D
             </div>
             <div className={cn("mt-2 w-full rounded-t-xl bg-linear-to-b", medal.block)} />
           </div>
@@ -58,13 +56,11 @@ export function Podium({ players, mode, currentUserId }: { players: Profile[]; m
 
 export function RankingTable({
   players,
-  mode,
   currentUserId,
   ranked,
   startIndex = 0,
 }: {
   players: Profile[];
-  mode: Mode;
   currentUserId: string;
   ranked: boolean;
   startIndex?: number;
@@ -83,7 +79,6 @@ export function RankingTable({
         </TableHeader>
         <TableBody>
           {players.map((p, i) => {
-            const s = statsFor(p, mode);
             const position = startIndex + i + 1;
             const isMe = p.id === currentUserId;
             return (
@@ -109,21 +104,21 @@ export function RankingTable({
                       </div>
                       <div className="truncate text-xs text-muted-foreground">
                         {fullName(p)}
-                        <span className="sm:hidden"> · {s.played} PJ</span>
+                        <span className="sm:hidden"> · {p.matches_played} PJ</span>
                       </div>
-                      {!ranked && <MatchesProgress played={s.played} className="mt-1 sm:hidden" />}
+                      {!ranked && <MatchesProgress played={p.matches_played} className="mt-1 sm:hidden" />}
                     </div>
                   </div>
                 </TableCell>
                 <TableCell className="hidden text-center tabular-nums sm:table-cell">
-                  {ranked ? s.played : <MatchesProgress played={s.played} />}
+                  {ranked ? p.matches_played : <MatchesProgress played={p.matches_played} />}
                 </TableCell>
                 <TableCell className="text-center tabular-nums">
-                  <span className="font-semibold text-success">{s.wins}</span>
+                  <span className="font-semibold text-success">{p.wins}</span>
                   <span className="text-muted-foreground">/</span>
-                  <span className="font-semibold text-destructive">{s.losses}</span>
+                  <span className="font-semibold text-destructive">{p.losses}</span>
                 </TableCell>
-                <TableCell className="pr-4 text-right text-base font-extrabold tabular-nums">{s.elo}</TableCell>
+                <TableCell className="pr-4 text-right text-base font-extrabold tabular-nums">{p.elo}</TableCell>
               </TableRow>
             );
           })}

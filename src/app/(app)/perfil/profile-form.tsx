@@ -1,46 +1,38 @@
 "use client";
 
 import { useActionState } from "react";
-import { Loader2, LogOut } from "lucide-react";
+import { ChevronDown, Loader2, LogOut, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { FormMessage, ProfileFields } from "@/components/form-bits";
-import { PlayerAvatar } from "@/components/player-avatar";
 import { updateProfile } from "@/app/actions";
 import { signOut } from "@/app/(auth)/actions";
 import type { Profile } from "@/lib/types";
 
+/** Datos editables del perfil, plegados para no distraer. */
 export function ProfileForm({ profile }: { profile: Profile }) {
   const [state, action, pending] = useActionState(updateProfile, null);
 
   return (
-    <div className="grid gap-4">
-      <Card>
-        <CardContent>
-          <div className="mb-5 flex items-center gap-4">
-            <PlayerAvatar player={profile} size={64} />
-            <div>
-              <div className="text-lg font-bold">{profile.nickname}</div>
-              <div className="text-sm text-muted-foreground">
-                1v1: {profile.elo} ELO · {profile.wins}V / {profile.losses}D
-              </div>
-              <div className="text-sm text-muted-foreground">
-                2v2: {profile.elo_doubles} ELO · {profile.doubles_wins}V / {profile.doubles_losses}D
-              </div>
-            </div>
-          </div>
-          <form action={action} className="grid gap-4">
-            <ProfileFields defaults={profile} avatarUserId={profile.id} />
-            <FormMessage state={state} />
-            <Button type="submit" size="lg" className="h-10" disabled={pending}>
-              {pending && <Loader2 className="animate-spin" />}
-              Guardar cambios
-            </Button>
-          </form>
-        </CardContent>
-      </Card>
+    <div className="grid gap-3">
+      <details className="group rounded-2xl border bg-card shadow-sm" open={state !== null && !state.ok}>
+        <summary className="flex cursor-pointer list-none items-center gap-3 p-4 font-semibold [&::-webkit-details-marker]:hidden">
+          <span className="flex size-8 items-center justify-center rounded-lg bg-accent text-primary">
+            <Pencil className="size-4" />
+          </span>
+          Editar mis datos y foto
+          <ChevronDown className="ml-auto size-5 text-muted-foreground transition-transform group-open:rotate-180" />
+        </summary>
+        <form action={action} className="grid gap-4 border-t p-4">
+          <ProfileFields defaults={profile} avatarUserId={profile.id} />
+          <FormMessage state={state} />
+          <Button type="submit" size="lg" className="h-11" disabled={pending}>
+            {pending && <Loader2 className="animate-spin" />}
+            Guardar cambios
+          </Button>
+        </form>
+      </details>
       <form action={signOut}>
-        <Button type="submit" variant="outline" size="lg" className="h-10 w-full">
+        <Button type="submit" variant="ghost" size="lg" className="h-11 w-full text-muted-foreground">
           <LogOut />
           Cerrar sesión
         </Button>

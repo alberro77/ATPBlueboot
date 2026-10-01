@@ -42,7 +42,7 @@ export function SegmentedButtons<T extends string>({
           role="radio"
           aria-checked={o.value === value}
           onClick={() => onChange(o.value)}
-          className={cn(item, "sm:flex-1", o.value === value && active)}
+          className={cn(item, "py-2.5 text-base font-semibold sm:flex-1", o.value === value && "bg-primary text-primary-foreground shadow-md shadow-primary/25 hover:text-primary-foreground")}
         >
           {o.label}
         </button>

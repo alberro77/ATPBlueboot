@@ -24,11 +24,8 @@ export function UserMenu({ profile }: { profile: Profile }) {
       >
         <PlayerAvatar player={profile} className="ring-2 ring-white/70" />
         <span className="text-left leading-none">
-          <span className="block text-[0.6rem] font-medium text-white/70">ELO 1v1 · 2v2</span>
-          <span className="block text-sm font-bold tabular-nums">
-            {profile.elo}
-            <span className="font-medium text-white/60"> · {profile.elo_doubles}</span>
-          </span>
+          <span className="block text-[0.6rem] font-medium text-white/70">ELO</span>
+          <span className="block text-sm font-bold tabular-nums">{profile.elo}</span>
         </span>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-52">

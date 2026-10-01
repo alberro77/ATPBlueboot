@@ -2,7 +2,7 @@ import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 import type { Profile } from "./types";
 
-export const PLAYER_FIELDS = "id, nickname, first_name, last_name, avatar_url, elo, elo_doubles";
+export const PLAYER_FIELDS = "id, nickname, first_name, last_name, avatar_url, elo";
 
 export const MATCH_FIELDS = `
   id, mode, reporter_id, reporter_partner_id, opponent_id, opponent_partner_id,
