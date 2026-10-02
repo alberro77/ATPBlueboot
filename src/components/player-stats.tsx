@@ -269,7 +269,7 @@ export function ModeStatsCards({
 }) {
   return (
     <section className="grid gap-2">
-      <h2 className="text-base font-bold">Récord por modalidad</h2>
+      <h2 className="text-base font-bold">Por modalidad</h2>
       <div className="grid gap-3 sm:grid-cols-2">
         <ModeCard
           mode="singles"
@@ -326,7 +326,7 @@ function ModeCard({ mode, record: r, elo, rank }: { mode: Mode; record: ModeReco
 
         {r.games === 0 ? (
           <p className="py-4 text-center text-sm text-muted-foreground">
-            {mode === "singles" ? "Todavía no jugó 1 vs 1." : "Todavía no jugó 2 vs 2."}
+            Sin partidos todavía
           </p>
         ) : (
           <>

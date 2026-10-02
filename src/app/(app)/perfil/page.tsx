@@ -25,9 +25,11 @@ export default async function ProfilePage() {
     <div className="mx-auto grid max-w-lg gap-4">
       <ProfileHero profile={me} isMe {...data} />
       <StatsCard profile={me} matches={data.matches} />
+      <EloChart points={data.eloHistory} nowMs={nowMs()} title="Tu AURA" />
       <ModeStatsCards matches={data.matches} playerId={me.id} profile={me} ranks={data.ranks} />
-      <EloChart points={data.eloHistory} nowMs={nowMs()} title="Tu AURA en el tiempo" />
       <RelationCards rival={rival} partner={partner} viewerId={me.id} />
+
+      <h2 className="mt-3 text-xs font-semibold tracking-wide text-muted-foreground uppercase">Ajustes</h2>
       <NotificationSettings
         initialPrefs={{
           matchPending: prefsRow?.match_pending ?? true,

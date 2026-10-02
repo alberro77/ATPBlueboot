@@ -14,7 +14,7 @@ export function ChallengeButton({ targetId, nickname }: { targetId: string; nick
   function challenge() {
     startTransition(async () => {
       const r = await sendChallenge(targetId);
-      if (r.ok) toast.success(`¡Desafío enviado a ${nickname}! 🏓`, { description: "Le avisamos para que acepte y juegue." });
+      if (r.ok) toast.success(`¡Desafío enviado a ${nickname}! 🏓`);
       else toast.error(r.error);
     });
   }

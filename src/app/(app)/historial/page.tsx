@@ -59,7 +59,7 @@ export default async function HistoryPage({ searchParams }: PageProps<"/historia
         />
       </div>
       {matches.length === 0 ? (
-        <EmptyState icon={Trophy} title="Todavía no hay partidos">Cuando se confirme el primero, aparece acá.</EmptyState>
+        <EmptyState icon={Trophy} title="Todavía no hay partidos" />
       ) : (
         <ul className="divide-y overflow-hidden rounded-2xl border bg-card shadow-sm">
           {matches.map((m) => (

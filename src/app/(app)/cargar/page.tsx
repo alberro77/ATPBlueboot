@@ -38,7 +38,7 @@ export default async function ReportMatchPage({ searchParams }: PageProps<"/carg
 
   return (
     <div className="mx-auto max-w-lg">
-      <PageHeader title="Cargar partido" description="¿Con quién jugaste y cómo salió?" />
+      <PageHeader title="Cargar partido" />
       <ReportMatchForm
         me={me}
         players={(players ?? []) as PlayerSummary[]}

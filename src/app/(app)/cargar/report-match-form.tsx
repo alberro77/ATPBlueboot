@@ -66,8 +66,8 @@ export function ReportMatchForm({
         <ModeToggle mode={mode} onChange={setMode} />
         <EmptyState icon={UsersRound} title="Faltan jugadores">
           {doubles
-            ? "Para jugar 2 vs 2 hacen falta al menos 4 jugadores registrados."
-            : "Todavía no hay otros jugadores registrados. ¡Invitá a tus compañeros!"}
+            ? "Faltan jugadores para un 2 vs 2."
+            : "Invitá a tus compañeros a sumarse."}
         </EmptyState>
       </div>
     );
@@ -171,7 +171,7 @@ export function ReportMatchForm({
       {nextEmpty && quickPicks.length > 0 && (
         <section className="grid gap-2">
           <p className="text-xs font-semibold text-muted-foreground">
-            {nextEmpty === "partner" ? "¿Tu compañero? Jugaste hace poco con:" : "¿Tu rival? Jugaste hace poco con:"}
+            Recientes
           </p>
           <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1">
             {quickPicks.map((p) => (
@@ -200,7 +200,7 @@ export function ReportMatchForm({
       {ready && !doubles && (
         <WinChance
           className="rounded-2xl border bg-card p-4 shadow-sm"
-          title={results.length === 0 ? "Chances de ganar" : "Chances en el próximo"}
+          title={results.length === 0 ? "Chances" : "Chances en el próximo"}
           myElo={myElo + afterSoFar}
           rivalElo={rivalElo - afterSoFar}
           rivalLabel={rivals[0]!.nickname}
@@ -213,7 +213,6 @@ export function ReportMatchForm({
           <p className="text-base font-bold">
             {!ready ? "Completá los jugadores" : results.length === 0 ? "¿Cómo salió?" : "¿Jugaron otro?"}
           </p>
-          {ready && <p className="text-xs text-muted-foreground">Tocá una vez por cada partido, en orden.</p>}
         </div>
         <div className="grid grid-cols-2 gap-3">
           <ResultButton
@@ -242,6 +241,7 @@ export function ReportMatchForm({
         />
       )}
 
+      {results.length > 0 && (
       <div className="sticky bottom-24 z-30 md:bottom-4">
         <button
           type="button"
@@ -252,11 +252,8 @@ export function ReportMatchForm({
           {pending ? <Loader2 className="size-5 animate-spin" /> : <Send className="size-5" />}
           {results.length <= 1 ? "Enviar resultado" : `Enviar ${results.length} partidos`}
         </button>
-        <p className="mt-2 text-center text-xs text-muted-foreground">
-          {doubles ? "Uno de los rivales" : "Tu rival"} {results.length > 1 ? "los confirma todos juntos" : "lo confirma"} y
-          recién ahí suma al ranking.
-        </p>
       </div>
+      )}
 
       {sheetSlot && (
         <PlayerSheet

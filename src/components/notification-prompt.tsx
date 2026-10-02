@@ -1,33 +1,57 @@
 "use client";
 
-import { BellRing, Loader2 } from "lucide-react";
+import { useState, useSyncExternalStore } from "react";
+import { BellRing, Loader2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useInstallBannerVisible } from "@/lib/prompt-slot";
 import { usePush } from "@/lib/use-push";
 
-/**
- * Aviso del home para activar las notificaciones. Se muestra mientras este
- * dispositivo no las tenga activadas y se puedan activar (no si el navegador
- * las bloqueó, no las soporta o falta instalar la app en iPhone).
- */
+const SNOOZE_KEY = "pp-notif-prompt-until";
+const SNOOZE_MS = 14 * 86_400_000;
+const noopSubscribe = () => () => {};
+
+function snoozed() {
+  try {
+    return Date.now() < Number(localStorage.getItem(SNOOZE_KEY) ?? 0);
+  } catch {
+    return false;
+  }
+}
+
+/** Aviso compacto para activar notificaciones. Se puede cerrar (vuelve en 2 semanas). */
 export function NotificationPrompt() {
   const { keyConfigured, supported, needsInstall, blocked, subscribed, busy, enable } = usePush();
+  const isSnoozed = useSyncExternalStore(noopSubscribe, snoozed, () => true);
+  // Un aviso a la vez: si se está ofreciendo instalar la app, este espera.
+  const waitInstall = useInstallBannerVisible();
+  const [closed, setClosed] = useState(false);
 
+  if (closed || isSnoozed || waitInstall) return null;
   // Mientras se averigua el estado (null) no se muestra nada, para evitar parpadeos.
   if (!keyConfigured || !supported || needsInstall || blocked || subscribed !== false) return null;
 
+  function close() {
+    setClosed(true);
+    try {
+      localStorage.setItem(SNOOZE_KEY, String(Date.now() + SNOOZE_MS));
+    } catch {}
+  }
+
   return (
-    <section className="mb-5 flex items-center gap-3 rounded-2xl border border-primary/30 bg-accent p-3 text-accent-foreground shadow-sm">
-      <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">
-        <BellRing className="size-5" />
+    <div className="mb-4 flex items-center gap-3 rounded-2xl bg-accent py-2 pr-1.5 pl-2.5 text-accent-foreground">
+      <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">
+        <BellRing className="size-4" />
       </span>
-      <div className="min-w-0 flex-1">
-        <p className="text-sm font-bold">Activá las notificaciones</p>
-        <p className="text-xs opacity-80">Enterate al instante cuando te cargan un partido o te desafían.</p>
-      </div>
-      <Button size="sm" className="shrink-0" disabled={busy} onClick={enable}>
+      <p className="min-w-0 flex-1 text-sm leading-tight">
+        <b>Activá los avisos</b> de partidos y desafíos
+      </p>
+      <Button size="sm" disabled={busy} onClick={enable}>
         {busy && <Loader2 className="animate-spin" />}
         Activar
       </Button>
-    </section>
+      <Button variant="ghost" size="icon-sm" aria-label="Ahora no" onClick={close}>
+        <X />
+      </Button>
+    </div>
   );
 }

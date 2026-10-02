@@ -17,7 +17,7 @@ export function StreakBadge({ streak, className }: { streak: number; className?:
         "inline-flex shrink-0 items-center gap-0.5 rounded-full px-1.5 py-0.5 align-middle text-[0.7rem] leading-none font-extrabold tabular-nums",
         blazing
           ? "bg-linear-to-r from-orange-500 to-red-500 text-white shadow-sm shadow-orange-500/40"
-          : "bg-orange-100 text-orange-600 dark:bg-orange-500/15 dark:text-orange-400",
+          : "bg-orange-100 text-orange-600 dark:bg-orange-950 dark:text-orange-300",
         className,
       )}
     >

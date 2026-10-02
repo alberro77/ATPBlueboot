@@ -68,7 +68,7 @@ export function Podium({
             </div>
             {index === 0 && leaderDays !== null && (
               <div className="mt-1 rounded-full bg-amber-100 px-2 py-0.5 text-[0.65rem] font-bold text-amber-700 dark:bg-amber-400/15 dark:text-amber-300">
-                {leaderDays < 1 ? "👑 Nuevo #1" : `👑 ${leaderDays} ${leaderDays === 1 ? "día" : "días"} en la cima`}
+                {leaderDays < 1 ? "👑 Nuevo" : `👑 ${leaderDays} ${leaderDays === 1 ? "día" : "días"}`}
               </div>
             )}
             <div className={cn("mt-2 w-full rounded-t-xl bg-linear-to-b", medal.block)} />

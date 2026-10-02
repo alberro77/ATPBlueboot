@@ -69,54 +69,50 @@ export async function reportSeries(input: {
     });
   }
 
-  const who = input.mode === "doubles" ? "uno de los rivales" : "tu rival";
-  return done(
-    n === 1
-      ? `Partido cargado. Suma al ranking cuando ${who} lo confirme.`
-      : `${n} partidos cargados. Suman al ranking cuando ${who} los confirme.`,
-  );
+  const who = input.mode === "doubles" ? "los rivales" : "tu rival";
+  return done(`Falta que ${who} ${n === 1 ? "lo" : "los"} confirme${input.mode === "doubles" ? "n" : ""}.`);
 }
 
 export async function confirmBatch(batchId: string): Promise<ActionResult> {
   const supabase = await createClient();
   const { data: count, error } = await supabase.rpc("confirm_batch", { p_batch_id: batchId });
   if (error) return { ok: false, error: error.message };
-  return done(`Se confirmaron ${count} partidos.`);
+  return done(count === 1 ? "Confirmado ✓" : `${count} partidos confirmados ✓`);
 }
 
 export async function rejectBatch(batchId: string): Promise<ActionResult> {
   const supabase = await createClient();
   const { error } = await supabase.rpc("reject_batch", { p_batch_id: batchId });
   if (error) return { ok: false, error: error.message };
-  return done("Partidos rechazados.");
+  return done("Rechazado");
 }
 
 export async function cancelBatch(batchId: string): Promise<ActionResult> {
   const supabase = await createClient();
   const { error } = await supabase.rpc("cancel_batch", { p_batch_id: batchId });
   if (error) return { ok: false, error: error.message };
-  return done("Partidos cancelados.");
+  return done("Cancelado");
 }
 
 export async function confirmMatch(matchId: string): Promise<ActionResult> {
   const supabase = await createClient();
-  const { data: delta, error } = await supabase.rpc("confirm_match", { p_match_id: matchId });
+  const { error } = await supabase.rpc("confirm_match", { p_match_id: matchId });
   if (error) return { ok: false, error: error.message };
-  return done(`Partido confirmado. Se transfirieron ${delta} puntos de AURA.`);
+  return done("Confirmado ✓");
 }
 
 export async function rejectMatch(matchId: string): Promise<ActionResult> {
   const supabase = await createClient();
   const { error } = await supabase.rpc("reject_match", { p_match_id: matchId });
   if (error) return { ok: false, error: error.message };
-  return done("Partido rechazado.");
+  return done("Rechazado");
 }
 
 export async function cancelMatch(matchId: string): Promise<ActionResult> {
   const supabase = await createClient();
   const { error } = await supabase.rpc("cancel_match", { p_match_id: matchId });
   if (error) return { ok: false, error: error.message };
-  return done("Partido cancelado.");
+  return done("Cancelado");
 }
 
 export async function updateProfile(
@@ -136,7 +132,7 @@ export async function updateProfile(
   if (error) {
     return { ok: false, error: error.code === "23505" ? NICKNAME_TAKEN : error.message };
   }
-  return done("Perfil actualizado.");
+  return done("Guardado ✓");
 }
 
 /** Desafía a otro jugador: queda registrado y se le avisa si tiene las notificaciones activas. */
@@ -214,5 +210,5 @@ export async function sendTestPush(): Promise<ActionResult> {
     url: "/perfil",
     tag: "test",
   });
-  return { ok: true, message: "Te mandamos una notificación de prueba." };
+  return { ok: true, message: "Enviada ✓" };
 }

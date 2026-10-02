@@ -58,8 +58,7 @@ export function SeasonPodium({ summary, viewerId }: { summary: SeasonSummary; vi
   if (qualified.length === 0) {
     return (
       <p className="rounded-2xl border border-dashed border-primary/25 bg-card/60 p-5 text-center text-sm text-muted-foreground">
-        Todavía nadie jugó {MIN_MATCHES_TO_RANK} partidos este mes. El campeón es quien más AURA gane con al menos{" "}
-        {MIN_MATCHES_TO_RANK} partidos.
+        Todavía no hay campeón. Se necesitan {MIN_MATCHES_TO_RANK} partidos en el mes.
       </p>
     );
   }
@@ -93,9 +92,6 @@ export function SeasonPodium({ summary, viewerId }: { summary: SeasonSummary; vi
           ),
         )}
       </div>
-      <p className="text-center text-xs text-muted-foreground">
-        Gana quien más AURA suma en el mes (mínimo {MIN_MATCHES_TO_RANK} partidos). El AURA no se resetea.
-      </p>
     </section>
   );
 }

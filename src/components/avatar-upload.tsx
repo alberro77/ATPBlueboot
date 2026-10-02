@@ -84,11 +84,7 @@ export function AvatarUpload({
         )}
       </div>
       <input type="hidden" name="avatar_url" value={url} />
-      {error ? (
-        <p className="text-xs text-destructive">{error}</p>
-      ) : (
-        <p className="text-xs text-muted-foreground">Se recorta en cuadrado y se comprime automáticamente.</p>
-      )}
+      {error && <p className="text-xs text-destructive">{error}</p>}
     </div>
   );
 }

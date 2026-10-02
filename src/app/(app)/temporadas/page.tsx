@@ -28,7 +28,7 @@ export default async function SeasonsPage() {
     <div className="mx-auto grid max-w-lg gap-5">
       <PageHeader
         title="Temporadas"
-        description="Cada mes es una temporada. El AURA sigue de largo; el campeón es quien más AURA suma en el mes."
+        description="Cada mes gana quien más AURA suma."
       />
 
       <Link prefetch={false}
@@ -53,7 +53,7 @@ export default async function SeasonsPage() {
             </span>
           </div>
         ) : (
-          <p className="mt-3 text-sm text-white/80">Todavía nadie jugó 3 partidos este mes. ¡Arrancá vos!</p>
+          <p className="mt-3 text-sm text-white/80">Todavía no hay campeón.</p>
         )}
         <span className="mt-3 flex items-center gap-1 text-sm font-semibold">
           Ver tabla del mes <ChevronRight className="size-4" />
@@ -63,9 +63,7 @@ export default async function SeasonsPage() {
       <section className="grid gap-2">
         <h2 className="text-base font-bold">Temporadas anteriores</h2>
         {past.length === 0 ? (
-          <EmptyState icon={Trophy} title="Esta es la primera temporada">
-            Cuando termine el mes, acá va a quedar el registro con el campeón y lo más destacado.
-          </EmptyState>
+          <EmptyState icon={Trophy} title="Esta es la primera temporada" />
         ) : (
           <ol className="grid gap-2">
             {past.map((s) => (

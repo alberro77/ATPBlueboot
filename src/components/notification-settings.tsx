@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Bell, BellOff, BellRing, Loader2, Send, Swords, Inbox } from "lucide-react";
+import { Bell, BellRing, Loader2, Send, Swords, Inbox } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { sendTestPush, updateNotificationPrefs } from "@/app/actions";
@@ -39,79 +39,60 @@ export function NotificationSettings({
   const on = subscribed === true && !blocked;
 
   return (
-    <section className="grid gap-3 rounded-2xl border bg-card p-4 shadow-sm">
-      <h2 className="flex items-center gap-2 text-base font-bold">
-        <span className="flex size-8 items-center justify-center rounded-lg bg-accent text-primary">
-          <Bell className="size-4" />
+    <section className="grid gap-2 rounded-2xl border bg-card p-4 shadow-sm">
+      <div className="flex items-center gap-3">
+        <span
+          className={cn(
+            "flex size-9 shrink-0 items-center justify-center rounded-xl",
+            on ? "bg-success/15 text-success" : "bg-accent text-primary",
+          )}
+        >
+          {on ? <BellRing className="size-4" /> : <Bell className="size-4" />}
         </span>
-        Notificaciones
-      </h2>
+        <div className="min-w-0 flex-1">
+          <h2 className="font-bold">Notificaciones</h2>
+          {on && <p className="text-xs text-muted-foreground">Activadas en este dispositivo</p>}
+        </div>
+        {keyConfigured && supported && !needsInstall && !blocked && subscribed !== null && (
+          <Button size="sm" variant={on ? "ghost" : "default"} disabled={busy} onClick={on ? disable : enable}>
+            {busy && <Loader2 className="animate-spin" />}
+            {on ? "Desactivar" : "Activar"}
+          </Button>
+        )}
+      </div>
 
       {!keyConfigured ? (
-        <Notice>Las notificaciones todavía no están configuradas en esta versión de la app.</Notice>
+        <Notice>No disponibles por ahora.</Notice>
       ) : !supported ? (
-        <Notice>Tu navegador no permite notificaciones. Probá desde Chrome, Edge, Firefox o Safari actualizados.</Notice>
+        <Notice>Tu navegador no las permite.</Notice>
       ) : needsInstall ? (
         <Notice>
-          En iPhone, primero agregá la app a la pantalla de inicio (<b>Compartir → Agregar a inicio</b>) y abrila desde
-          ahí. Después podés activar las notificaciones.
+          En iPhone, primero agregá la app a inicio: <b>Compartir → Agregar a inicio</b>.
         </Notice>
       ) : blocked ? (
-        <Notice>
-          Bloqueaste las notificaciones para este sitio. Para volver a activarlas, habilitalas desde la configuración
-          del navegador o de la app.
-        </Notice>
-      ) : (
-        <div className="flex items-center gap-3 rounded-xl bg-muted/60 p-3">
-          <span
-            className={cn(
-              "flex size-10 shrink-0 items-center justify-center rounded-full",
-              on ? "bg-success/15 text-success" : "bg-muted text-muted-foreground",
-            )}
-          >
-            {on ? <BellRing className="size-5" /> : <BellOff className="size-5" />}
-          </span>
-          <div className="min-w-0 flex-1">
-            <p className="text-sm font-semibold">{on ? "Activadas en este dispositivo" : "Desactivadas en este dispositivo"}</p>
-            <p className="text-xs text-muted-foreground">
-              {on ? "Te avisamos aunque no tengas la app abierta." : "Activalas para enterarte al instante."}
-            </p>
-          </div>
-          {subscribed !== null && (
-            <Button size="sm" variant={on ? "outline" : "default"} disabled={busy} onClick={on ? disable : enable}>
-              {busy && <Loader2 className="animate-spin" />}
-              {on ? "Desactivar" : "Activar"}
-            </Button>
-          )}
-        </div>
-      )}
+        <Notice>Están bloqueadas. Habilitalas desde la configuración del navegador.</Notice>
+      ) : null}
 
-      <div className="grid gap-1">
-        <p className="text-xs font-semibold text-muted-foreground uppercase">Qué avisos querés recibir</p>
+      <div className="grid">
         <Switch
           icon={Inbox}
           title="Partidos para confirmar"
-          description="Cuando alguien carga un partido contra vos."
           checked={prefs.matchPending}
           onChange={() => togglePref("matchPending")}
         />
-        <Switch
-          icon={Swords}
-          title="Desafíos"
-          description="Cuando alguien te desafía a jugar."
-          checked={prefs.challenges}
-          onChange={() => togglePref("challenges")}
-        />
-        <p className="text-xs text-muted-foreground">
-          Estos ajustes valen para todos tus dispositivos. Igual vas a ver todo en la app, en Mis partidos.
-        </p>
+        <Switch icon={Swords} title="Desafíos" checked={prefs.challenges} onChange={() => togglePref("challenges")} />
       </div>
 
       {on && (
-        <Button variant="outline" size="sm" className="justify-self-start" disabled={testing} onClick={test}>
-          {testing ? <Loader2 className="animate-spin" /> : <Send />}
-          Enviar notificación de prueba
-        </Button>
+        <button
+          type="button"
+          disabled={testing}
+          onClick={test}
+          className="flex items-center gap-1.5 justify-self-start rounded-lg px-2 py-1.5 text-xs font-semibold text-primary hover:bg-accent disabled:opacity-50"
+        >
+          {testing ? <Loader2 className="size-3.5 animate-spin" /> : <Send className="size-3.5" />}
+          Probar
+        </button>
       )}
     </section>
   );
@@ -124,13 +105,11 @@ function Notice({ children }: { children: React.ReactNode }) {
 function Switch({
   icon: Icon,
   title,
-  description,
   checked,
   onChange,
 }: {
   icon: typeof Bell;
   title: string;
-  description: string;
   checked: boolean;
   onChange: () => void;
 }) {
@@ -144,8 +123,7 @@ function Switch({
     >
       <Icon className="size-5 shrink-0 text-primary" />
       <span className="min-w-0 flex-1">
-        <span className="block text-sm font-semibold">{title}</span>
-        <span className="block text-xs text-muted-foreground">{description}</span>
+        <span className="block text-sm font-medium">{title}</span>
       </span>
       <span
         aria-hidden

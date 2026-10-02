@@ -4,6 +4,7 @@ import { useEffect, useState, useSyncExternalStore } from "react";
 import { Download, Share, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { BlueBootIcon } from "@/components/brand/logo";
+import { setInstallBannerVisible } from "@/lib/prompt-slot";
 
 type BeforeInstallPromptEvent = Event & {
   prompt: () => Promise<void>;
@@ -62,7 +63,13 @@ export function InstallApp() {
     };
   }, []);
 
-  if (installed || dismissed || closed || (!prompt && !ios)) return null;
+  const visible = !(installed || dismissed || closed || (!prompt && !ios));
+  useEffect(() => {
+    setInstallBannerVisible(visible);
+    return () => setInstallBannerVisible(false);
+  }, [visible]);
+
+  if (!visible) return null;
 
   function close() {
     setClosed(true);
@@ -80,19 +87,17 @@ export function InstallApp() {
   }
 
   return (
-    <div className="mb-5 flex items-center gap-3 rounded-xl border border-primary/30 bg-accent p-3 text-accent-foreground">
-      <BlueBootIcon className="size-10 shrink-0" />
-      <div className="min-w-0 flex-1 text-sm">
-        <p className="font-semibold">Instalá la app en tu celular</p>
+    <div className="mb-4 flex items-center gap-3 rounded-2xl bg-accent py-2 pr-1.5 pl-2.5 text-accent-foreground">
+      <BlueBootIcon className="size-8 shrink-0" />
+      <p className="min-w-0 flex-1 text-sm leading-tight">
         {prompt ? (
-          <p className="text-xs opacity-80">Abrila desde la pantalla de inicio, a pantalla completa.</p>
+          <b>Instalá la app</b>
         ) : (
-          <p className="text-xs opacity-80">
-            Tocá <Share className="inline size-3.5 align-text-top" /> <b>Compartir</b> y después{" "}
-            <b>Agregar a inicio</b>.
-          </p>
+          <>
+            <b>Instalá la app:</b> <Share className="inline size-3.5 align-text-top" /> → Agregar a inicio
+          </>
         )}
-      </div>
+      </p>
       {prompt && (
         <Button size="sm" onClick={install}>
           <Download />

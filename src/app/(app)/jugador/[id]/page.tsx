@@ -55,7 +55,7 @@ export default async function PlayerPage({ params }: PageProps<"/jugador/[id]">)
       <HeadToHead player={player} me={me} matches={data.matches} />
       <StatsCard profile={player} matches={data.matches} />
       <ModeStatsCards matches={data.matches} playerId={player.id} profile={player} ranks={data.ranks} />
-      <EloChart points={data.eloHistory} nowMs={nowMs()} />
+      <EloChart points={data.eloHistory} nowMs={nowMs()} title="AURA" />
       <RelationCards
         rival={rival}
         partner={partner}
@@ -119,7 +119,7 @@ function HeadToHead({ player, me, matches }: { player: Profile; me: Profile; mat
         </div>
         {played === 0 ? (
           <p className="text-center text-sm text-muted-foreground">
-            Todavía no jugaron un 1 vs 1 entre ustedes. ¡Es hora de estrenar la rivalidad!
+            Todavía no jugaron 1 vs 1.
           </p>
         ) : (
           <>

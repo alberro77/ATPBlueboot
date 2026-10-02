@@ -65,6 +65,9 @@
   --primary: oklch(0.58 0.115 230);
   --primary-foreground: oklch(1 0 0);
   --primary-strong: oklch(0.47 0.1 235);
+  /* Franja de marca (fondos azules con texto blanco). */
+  --brand-from: oklch(0.58 0.115 230);
+  --brand-to: oklch(0.47 0.1 235);
   --secondary: oklch(0.95 0.022 230);
   --secondary-foreground: oklch(0.36 0.075 236);
   --muted: oklch(0.955 0.012 230);
@@ -103,6 +106,9 @@
   --primary: oklch(0.68 0.12 230);
   --primary-foreground: oklch(0.18 0.04 238);
   --primary-strong: oklch(0.5 0.1 234);
+  /* En oscuro, azules más profundos para que el texto blanco mantenga contraste. */
+  --brand-from: oklch(0.47 0.1 232);
+  --brand-to: oklch(0.36 0.08 238);
   --secondary: oklch(0.29 0.04 237);
   --secondary-foreground: oklch(0.92 0.03 230);
   --muted: oklch(0.27 0.03 238);
@@ -148,6 +154,6 @@
 @layer utilities {
   /* Franja de marca: azul del logo con un degradé suave hacia un azul más profundo. */
   .bg-brand {
-    background-image: linear-gradient(135deg, var(--primary) 0%, var(--primary-strong) 100%);
+    background-image: linear-gradient(135deg, var(--brand-from) 0%, var(--brand-to) 100%);
   }
 }

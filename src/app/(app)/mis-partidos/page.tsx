@@ -92,12 +92,11 @@ export default async function MyMatchesPage() {
       />
 
       {decayPoints > 0 && (
-        <div className="flex items-start gap-3 rounded-2xl border border-destructive/30 bg-destructive/5 p-4 text-sm">
-          <TrendingDown className="mt-0.5 size-5 shrink-0 text-destructive" />
-          <div>
-            <p className="font-semibold">Perdiste {decayPoints} puntos por inactividad este mes</p>
-            <p className="text-muted-foreground">Jugá un partido para frenar el descuento.</p>
-          </div>
+        <div className="flex items-center gap-2.5 rounded-2xl bg-destructive/10 px-3 py-2.5 text-sm">
+          <TrendingDown className="size-4 shrink-0 text-destructive" />
+          <p>
+            <b className="tabular-nums text-destructive">−{decayPoints} AURA</b> por inactividad este mes
+          </p>
         </div>
       )}
 
@@ -136,9 +135,9 @@ export default async function MyMatchesPage() {
           Para confirmar
         </SectionTitle>
         {toConfirm.length === 0 ? (
-          <EmptyState icon={PartyPopper} title="¡Estás al día!">
-            Cuando alguien cargue un partido contra vos, lo vas a ver acá para confirmarlo.
-          </EmptyState>
+          <p className="flex items-center gap-2 rounded-2xl bg-muted/60 px-3 py-2.5 text-sm text-muted-foreground">
+            <PartyPopper className="size-4 shrink-0 text-primary" /> Nada para confirmar
+          </p>
         ) : (
           toConfirm.map((g) => <IncomingCard key={g.key} group={g} me={me} />)
         )}
@@ -171,12 +170,10 @@ export default async function MyMatchesPage() {
             title="Todavía no jugaste"
             action={
               <Link href="/cargar" className={buttonVariants()}>
-                <Plus /> Cargar mi primer partido
+                <Plus /> Cargar partido
               </Link>
             }
-          >
-            Jugá un partido y cargalo: tu historial y tu AURA aparecen acá.
-          </EmptyState>
+          />
         ) : (
           <ul className="divide-y overflow-hidden rounded-2xl border bg-card shadow-sm">
             {history.map((m) => (
@@ -282,16 +279,9 @@ function IncomingCard({ group, me }: { group: PendingGroup; me: Profile }) {
           {series && <ResultChips results={results} />}
         </div>
 
-        <p className="text-center text-sm">
-          ¿Es correcto? Si confirmás:{" "}
-          <DeltaPill delta={preview} suffix={doubles ? " AURA c/u" : " AURA"} />
-          {series && <span className="block text-xs text-muted-foreground">(estimado para la serie completa)</span>}
+        <p className="text-center text-sm text-muted-foreground">
+          Si confirmás <DeltaPill delta={preview} suffix={doubles ? " AURA c/u" : " AURA"} />
         </p>
-        {doubles && p.partner && (
-          <p className="-mt-2 text-center text-xs text-muted-foreground">
-            Alcanza con que confirme uno de los dos ({p.partner.nickname} también puede).
-          </p>
-        )}
         <ConfirmRejectButtons target={group.target} count={results.length} />
       </CardContent>
     </Card>

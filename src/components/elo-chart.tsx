@@ -73,7 +73,7 @@ export function EloChart({ points, nowMs, title = "Evolución del AURA" }: { poi
           <TrendingUp className="size-4 text-primary" /> {title}
         </h2>
         <div className="rounded-2xl border border-dashed border-primary/25 bg-card/60 px-6 py-8 text-center text-sm text-muted-foreground">
-          Cuando haya partidos confirmados, acá vas a ver cómo sube (o baja) el AURA. 📈
+          Todavía no hay partidos.
         </div>
       </section>
     );

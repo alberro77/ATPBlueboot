@@ -29,11 +29,11 @@ export function WinChance({
   const verdict =
     mine >= 65
       ? team
-        ? "Son favoritos 💪"
-        : "Sos favorito 💪"
+        ? "Son favoritos"
+        : "Sos favorito"
       : mine <= 35
-        ? "Viene difícil… ¡a dar la sorpresa! 🎯"
-        : "Partido parejo 🤝";
+        ? "Viene difícil"
+        : "Parejo";
 
   return (
     <div className={cn("grid gap-2", className)}>
