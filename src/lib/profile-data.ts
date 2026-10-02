@@ -1,8 +1,9 @@
 import { involving, MATCH_FIELDS } from "@/lib/data";
 import { MIN_MATCHES_TO_RANK } from "@/lib/elo";
 import { reignDays, type Reign } from "@/lib/format";
+import { statsFor } from "@/lib/modes";
 import type { createClient } from "@/lib/supabase/server";
-import type { EloEvent, MatchWithPlayers } from "@/lib/types";
+import type { EloEvent, MatchWithPlayers, Profile, Scope } from "@/lib/types";
 import type { EloPoint } from "@/components/elo-chart";
 
 type Supabase = Awaited<ReturnType<typeof createClient>>;
@@ -11,29 +12,22 @@ type Supabase = Awaited<ReturnType<typeof createClient>>;
 export async function loadProfileData(supabase: Supabase, playerId: string) {
   const [matchData, { data: rankedData }, { data: reignData }, { data: eventData }] = await Promise.all([
     fetchAllConfirmed(supabase, playerId),
-    supabase
-      .from("profiles")
-      .select("id")
-      .gte("matches_played", MIN_MATCHES_TO_RANK)
-      .order("elo", { ascending: false })
-      .order("wins", { ascending: false })
-      .order("nickname"),
+    supabase.from("profiles").select("*"),
     supabase.from("top_reigns").select("started_at, ended_at").eq("profile_id", playerId),
     supabase
       .from("elo_events")
       .select("id, kind, mode, delta, elo_after, created_at")
       .eq("profile_id", playerId)
+      .eq("scope", "global")
       .order("created_at")
       .order("id")
       .limit(2000),
   ]);
 
-  const ranked = (rankedData ?? []) as { id: string }[];
   const reigns = (reignData ?? []) as Reign[];
   return {
     matches: matchData,
-    position: ranked.findIndex((p) => p.id === playerId) + 1,
-    rankedCount: ranked.length,
+    ranks: ranksOf((rankedData ?? []) as Profile[], playerId),
     daysAtTop: reignDays(reigns),
     reigningNow: reigns.some((r) => r.ended_at === null),
     eloHistory: toEloPoints((eventData ?? []) as EloEvent[]),
@@ -68,4 +62,18 @@ async function fetchAllConfirmed(supabase: Supabase, playerId: string) {
     all.push(...rows);
     if (rows.length < PAGE) return all;
   }
+}
+
+export type Rank = { position: number; count: number };
+
+/** Posición del jugador (0 = sin clasificar) y cantidad de clasificados en cada uno de los tres rankings. */
+function ranksOf(players: Profile[], playerId: string): Record<Scope, Rank> {
+  const rank = (scope: Scope): Rank => {
+    const list = players
+      .map((p) => ({ p, s: statsFor(p, scope) }))
+      .filter(({ s }) => s.played >= MIN_MATCHES_TO_RANK)
+      .sort((a, b) => b.s.elo - a.s.elo || b.s.wins - a.s.wins || a.p.nickname.localeCompare(b.p.nickname));
+    return { position: list.findIndex(({ p }) => p.id === playerId) + 1, count: list.length };
+  };
+  return { global: rank("global"), singles: rank("singles"), doubles: rank("doubles") };
 }

@@ -6,7 +6,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Input } from "@/components/ui/input";
 import { PlayerAvatar } from "@/components/player-avatar";
 import { fullName } from "@/lib/format";
-import type { PlayerSummary } from "@/lib/types";
+import { ratingOf } from "@/lib/modes";
+import type { Mode, PlayerSummary } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 function normalize(text: string) {
@@ -24,6 +25,7 @@ export function PlayerSheet({
   players,
   recentIds = [],
   selectedId,
+  mode,
   onPick,
 }: {
   open: boolean;
@@ -32,6 +34,8 @@ export function PlayerSheet({
   players: PlayerSummary[];
   recentIds?: string[];
   selectedId?: string | null;
+  /** Modalidad: se muestra el puntaje de cada jugador en ese ranking. */
+  mode: Mode;
   onPick: (id: string) => void;
 }) {
   const [query, setQuery] = useState("");
@@ -114,7 +118,7 @@ export function PlayerSheet({
                       <span className="block truncate text-sm font-semibold">{p.nickname}</span>
                       <span className="block truncate text-xs text-muted-foreground">{fullName(p)}</span>
                     </span>
-                    <span className="text-xs font-semibold tabular-nums text-muted-foreground">{p.elo}</span>
+                    <span className="text-xs font-semibold tabular-nums text-muted-foreground">{ratingOf(p, mode)}</span>
                   </button>
                 </li>
               ))}

@@ -5,6 +5,7 @@ import { PlayerAvatar } from "@/components/player-avatar";
 import { perspective } from "@/components/match-views";
 import { MIN_MATCHES_TO_RANK, ON_FIRE_STREAK } from "@/lib/elo";
 import { fullName, playerHref, signed } from "@/lib/format";
+import type { Rank } from "@/lib/profile-data";
 import type { MatchWithPlayers, Mode, PlayerSummary, Profile } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -255,19 +256,39 @@ export function computeModeRecord(matches: MatchWithPlayers[], playerId: string,
 }
 
 /** Récord y estadísticas separadas por modalidad. */
-export function ModeStatsCards({ matches, playerId }: { matches: MatchWithPlayers[]; playerId: string }) {
+export function ModeStatsCards({
+  matches,
+  playerId,
+  profile,
+  ranks,
+}: {
+  matches: MatchWithPlayers[];
+  playerId: string;
+  profile: Profile;
+  ranks: Record<"singles" | "doubles", Rank>;
+}) {
   return (
     <section className="grid gap-2">
       <h2 className="text-base font-bold">Récord por modalidad</h2>
       <div className="grid gap-3 sm:grid-cols-2">
-        <ModeCard mode="singles" record={computeModeRecord(matches, playerId, "singles")} />
-        <ModeCard mode="doubles" record={computeModeRecord(matches, playerId, "doubles")} />
+        <ModeCard
+          mode="singles"
+          record={computeModeRecord(matches, playerId, "singles")}
+          elo={profile.singles_elo}
+          rank={ranks.singles}
+        />
+        <ModeCard
+          mode="doubles"
+          record={computeModeRecord(matches, playerId, "doubles")}
+          elo={profile.doubles_elo}
+          rank={ranks.doubles}
+        />
       </div>
     </section>
   );
 }
 
-function ModeCard({ mode, record: r }: { mode: Mode; record: ModeRecord }) {
+function ModeCard({ mode, record: r, elo, rank }: { mode: Mode; record: ModeRecord; elo: number; rank: Rank }) {
   const winRate = r.games > 0 ? Math.round((r.wins / r.games) * 100) : null;
   return (
     <Card className="gap-0 py-0">
@@ -291,6 +312,16 @@ function ModeCard({ mode, record: r }: { mode: Mode; record: ModeRecord }) {
               {r.eloChange === 0 ? "±0" : signed(r.eloChange)} AURA
             </span>
           )}
+        </div>
+
+        <div className="flex items-baseline justify-between">
+          <p>
+            <span className="text-2xl leading-none font-extrabold tabular-nums">{elo}</span>{" "}
+            <span className="text-xs text-muted-foreground">AURA</span>
+          </p>
+          <p className="text-xs font-semibold text-muted-foreground tabular-nums">
+            {rank.position > 0 ? `#${rank.position} de ${rank.count}` : "Sin clasificar"}
+          </p>
         </div>
 
         {r.games === 0 ? (

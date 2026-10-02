@@ -3,7 +3,7 @@ import { cn } from "@/lib/utils";
 
 const container = "inline-flex w-full rounded-xl bg-muted p-1 sm:w-auto";
 const item =
-  "flex flex-1 items-center justify-center gap-1.5 rounded-lg px-4 py-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground sm:flex-none";
+  "flex flex-1 items-center justify-center gap-1.5 rounded-lg px-2 py-2 text-sm font-medium sm:px-4 text-muted-foreground transition-colors hover:text-foreground sm:flex-none";
 const active = "bg-background text-foreground shadow-sm";
 
 /** Selector segmentado basado en links (el estado vive en la URL). */

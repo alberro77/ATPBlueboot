@@ -6,7 +6,11 @@
 -- (también migra bases creadas con versiones anteriores).
 --
 -- Reglas de negocio implementadas acá (fuente de verdad):
---   · Un solo ELO por jugador para 1v1 y 2v2. Inicial 1000, K = 32.
+--   · Tres rankings: Global (el principal), 1 vs 1 y 2 vs 2. Cada uno tiene
+--     su propio puntaje (inicial 1000, K = 32), partidos, récord, rachas y
+--     descuento por inactividad. Cada partido confirmado actualiza DOS tablas:
+--     la Global y la de su modalidad, y cada una se calcula contra sus propios
+--     puntajes (profiles: elo / singles_elo / doubles_elo y sus columnas gemelas).
 --   · 1v1: fórmula ELO estándar entre los dos jugadores.
 --   · 2v2: ELO del equipo = promedio de sus integrantes; los 4 jugadores
 --     suman o restan el mismo Δ. Un compañero fuerte sube el promedio del
@@ -17,12 +21,12 @@
 --     jugadores (report_series) y el rival los confirma todos juntos.
 --   · Solo se carga quién ganó. El partido queda 'pending' hasta que el rival
 --     (en 2v2: cualquiera de los dos rivales) lo confirma.
---   · Clasificado = 3 o más partidos confirmados (1v1 y 2v2 suman).
+--   · Clasificado en un ranking = 3 o más partidos confirmados en ese ranking.
 --   · Días en el top 1: top_reigns guarda cada período como #1 del ranking
 --     oficial (se actualiza al confirmar partidos y al aplicar decay).
 --   · Temporadas: cada mes calendario (hora de Argentina) es una temporada.
---     El ELO NO se resetea; season_elo() da el ELO de cada jugador al inicio
---     y al cierre del mes y la app arma el resumen (campeón = más ELO ganado).
+--     El puntaje NO se resetea; season_elo() da el puntaje Global de cada
+--     jugador al inicio y al cierre del mes y la app arma el resumen.
 --   · Notificaciones push: avisan al rival cuando le cargan partidos y cuando
 --     lo desafían. Cada jugador elige qué avisos recibir; los límites de
 --     desafíos (1 cada 10 min por rival, 20 por hora) se controlan acá.
@@ -87,6 +91,26 @@ alter table public.profiles add constraint profiles_nickname_check
   check (char_length(nickname) between 2 and 25 and nickname = btrim(nickname));
 
 create unique index if not exists profiles_nickname_key on public.profiles (lower(nickname));
+
+-- Rankings por modalidad. Las columnas sin prefijo (elo, wins, ...) son el ranking
+-- Global; estas son las mismas estadísticas para 1 vs 1 y 2 vs 2.
+alter table public.profiles
+  add column if not exists singles_elo integer not null default 1000,
+  add column if not exists singles_matches_played integer not null default 0,
+  add column if not exists singles_wins integer not null default 0,
+  add column if not exists singles_losses integer not null default 0,
+  add column if not exists singles_last_match_at timestamptz,
+  add column if not exists singles_decay_weeks_applied integer not null default 0,
+  add column if not exists singles_win_streak integer not null default 0,
+  add column if not exists singles_best_win_streak integer not null default 0,
+  add column if not exists doubles_elo integer not null default 1000,
+  add column if not exists doubles_matches_played integer not null default 0,
+  add column if not exists doubles_wins integer not null default 0,
+  add column if not exists doubles_losses integer not null default 0,
+  add column if not exists doubles_last_match_at timestamptz,
+  add column if not exists doubles_decay_weeks_applied integer not null default 0,
+  add column if not exists doubles_win_streak integer not null default 0,
+  add column if not exists doubles_best_win_streak integer not null default 0;
 
 -- Sin caracteres de control ni invisibles (evita apodos "clonados" o rotos).
 alter table public.profiles drop constraint if exists profiles_clean_text;
@@ -163,6 +187,9 @@ alter table public.matches
 
 create index if not exists matches_batch_idx on public.matches (batch_id) where batch_id is not null;
 
+-- elo_delta = puntos del ranking de la modalidad; global_elo_delta = del ranking Global.
+alter table public.matches add column if not exists global_elo_delta integer;
+
 alter table public.matches drop constraint if exists matches_mode_players;
 alter table public.matches add constraint matches_mode_players check (
   (mode = 'singles' and reporter_partner_id is null and opponent_partner_id is null)
@@ -196,6 +223,11 @@ create table if not exists public.elo_events (
 alter table public.elo_events add column if not exists mode public.match_mode;
 alter table public.elo_events alter column mode drop not null;
 alter table public.elo_events alter column mode drop default;
+
+-- Ranking al que pertenece el cambio: global, singles o doubles.
+alter table public.elo_events add column if not exists scope text not null default 'global';
+alter table public.elo_events drop constraint if exists elo_events_scope_check;
+alter table public.elo_events add constraint elo_events_scope_check check (scope in ('global', 'singles', 'doubles'));
 
 create index if not exists elo_events_profile_idx on public.elo_events (profile_id, created_at desc);
 
@@ -290,6 +322,7 @@ drop function if exists public.report_match(uuid, integer, integer);
 drop function if exists public.report_doubles_match(uuid, uuid, uuid, integer, integer);
 drop function if exists public.report_match(uuid, boolean);
 drop function if exists public.report_doubles_match(uuid, uuid, uuid, boolean);
+drop function if exists private.sync_decay(uuid, timestamptz);
 
 -- ---------------------------------------------------------------------
 -- Decay por inactividad
@@ -299,7 +332,8 @@ drop function if exists public.report_doubles_match(uuid, uuid, uuid, boolean);
 -- inactividad que correspondan y, si ya se habían cobrado de más (porque un
 -- partido confirmado tarde demuestra que jugó antes), las devuelve.
 -- Devuelve el cambio de ELO aplicado (negativo = penalización).
-create or replace function private.sync_decay(p_profile_id uuid, p_as_of timestamptz)
+-- p_prefix elige el ranking: '' = Global, 'singles_' = 1 vs 1, 'doubles_' = 2 vs 2.
+create or replace function private.sync_decay(p_profile_id uuid, p_as_of timestamptz, p_prefix text default '')
 returns integer
 language plpgsql
 security definer
@@ -312,13 +346,15 @@ declare
   v_applied  integer;
   v_owed     integer;
   v_change   integer;
+  v_scope    text := case p_prefix when 'singles_' then 'singles' when 'doubles_' then 'doubles' else 'global' end;
 begin
-  select elo, matches_played, last_match_at, decay_weeks_applied
-    into v_elo, v_played, v_last, v_applied
-    from public.profiles where id = p_profile_id for update;
+  execute format(
+    'select %I, %I, %I, %I from public.profiles where id = $1 for update',
+    p_prefix || 'elo', p_prefix || 'matches_played', p_prefix || 'last_match_at', p_prefix || 'decay_weeks_applied'
+  ) into v_elo, v_played, v_last, v_applied using p_profile_id;
 
   -- Sin partidos previos, o el partido es anterior al último registrado: nada que ajustar.
-  if not found or v_last is null or p_as_of <= v_last then
+  if v_last is null or p_as_of <= v_last then
     return 0;
   end if;
 
@@ -333,18 +369,19 @@ begin
 
   v_change := (v_applied - v_owed) * 10;
 
-  update public.profiles
-     set elo = elo + v_change, decay_weeks_applied = v_owed
-   where id = p_profile_id;
+  execute format(
+    'update public.profiles set %1$I = %1$I + $2, %2$I = $3 where id = $1',
+    p_prefix || 'elo', p_prefix || 'decay_weeks_applied'
+  ) using p_profile_id, v_change, v_owed;
 
-  insert into public.elo_events (profile_id, kind, delta, elo_after, created_at)
-  values (p_profile_id, 'decay', v_change, v_elo + v_change, p_as_of);
+  insert into public.elo_events (profile_id, kind, scope, delta, elo_after, created_at)
+  values (p_profile_id, 'decay', v_scope, v_change, v_elo + v_change, p_as_of);
 
   return v_change;
 end;
 $$;
 
--- Aplica el decay pendiente a todos. Idempotente: se puede llamar cuantas veces se quiera.
+-- Aplica el decay pendiente a todos, en los tres rankings. Idempotente.
 -- La ejecuta pg_cron a diario y la app al cargar el ranking.
 create or replace function public.apply_inactivity_decay()
 returns integer
@@ -353,22 +390,30 @@ security definer
 set search_path = ''
 as $$
 declare
-  r        record;
-  v_count  integer := 0;
+  r         record;
+  v_prefix  text;
+  v_count   integer := 0;
+  v_global  integer := 0;
 begin
-  for r in
-    select id
-      from public.profiles
-     where matches_played >= 3
-       and last_match_at < now() - interval '7 days'
-       and floor(extract(epoch from now() - last_match_at) / 604800) > decay_weeks_applied
-     order by id
-  loop
-    if private.sync_decay(r.id, now()) <> 0 then
-      v_count := v_count + 1;
-    end if;
+  foreach v_prefix in array array['', 'singles_', 'doubles_'] loop
+    for r in execute format(
+      $q$select id from public.profiles
+          where %1$I >= 3
+            and %2$I < now() - interval '7 days'
+            and floor(extract(epoch from now() - %2$I) / 604800) > %3$I
+          order by id$q$,
+      v_prefix || 'matches_played', v_prefix || 'last_match_at', v_prefix || 'decay_weeks_applied'
+    ) loop
+      if private.sync_decay(r.id, now(), v_prefix) <> 0 then
+        v_count := v_count + 1;
+        if v_prefix = '' then
+          v_global := v_global + 1;
+        end if;
+      end if;
+    end loop;
   end loop;
-  if v_count > 0 then
+
+  if v_global > 0 then
     perform private.update_leader(now());
   end if;
   return v_count;
@@ -456,9 +501,12 @@ as $$
   select greatest(1, round(32 * (1 - 1 / (1 + power(10::numeric, (p_loser - p_winner) / 400.0))))::integer);
 $$;
 
--- Aplica el resultado de un partido (1v1 o 2v2) a los jugadores. Devuelve Δ.
+-- Aplica un partido a UN ranking (p_prefix: '' = Global, 'singles_', 'doubles_'):
+-- calcula Δ con los puntajes de ese ranking y actualiza puntaje, partidos, récord,
+-- rachas y descuento de ese ranking. p_is_mode = true guarda además el Δ y los
+-- puntajes previos en el partido (los de la modalidad); false guarda el Δ Global.
 -- Usa la fecha en que se jugó (created_at) para el decay y para last_match_at.
-create or replace function private.settle_match(p_match public.matches)
+create or replace function private.settle_scope(p_match public.matches, p_prefix text, p_is_mode boolean)
 returns integer
 language plpgsql
 security definer
@@ -470,6 +518,15 @@ declare
   v_team_b   uuid[] := array_remove(array[p_match.opponent_id, p_match.opponent_partner_id], null);
   v_players  uuid[];
   v_winners  uuid[];
+  v_scope    text := case p_prefix when 'singles_' then 'singles' when 'doubles_' then 'doubles' else 'global' end;
+  c_elo      text := p_prefix || 'elo';
+  c_played   text := p_prefix || 'matches_played';
+  c_wins     text := p_prefix || 'wins';
+  c_losses   text := p_prefix || 'losses';
+  c_last     text := p_prefix || 'last_match_at';
+  c_decay    text := p_prefix || 'decay_weeks_applied';
+  c_streak   text := p_prefix || 'win_streak';
+  c_best     text := p_prefix || 'best_win_streak';
   v_a_avg    numeric;
   v_b_avg    numeric;
   v_delta    integer;
@@ -478,64 +535,98 @@ begin
   v_players := v_team_a || v_team_b;
   v_winners := case when p_match.reporter_won then v_team_a else v_team_b end;
 
-  -- Bloqueo en orden estable para evitar deadlocks entre confirmaciones simultáneas.
-  perform 1 from public.profiles where id = any (v_players) order by id for update;
-
-  -- Decay al día a la fecha del partido, antes de calcular con el ELO vigente.
+  -- Decay al día a la fecha del partido, antes de calcular con el puntaje vigente.
   foreach v_id in array v_players loop
-    perform private.sync_decay(v_id, v_as_of);
+    perform private.sync_decay(v_id, v_as_of, p_prefix);
   end loop;
 
-  -- ELO de cada equipo = promedio de sus integrantes (en 1v1, el del jugador).
-  select avg(elo) into v_a_avg from public.profiles where id = any (v_team_a);
-  select avg(elo) into v_b_avg from public.profiles where id = any (v_team_b);
+  -- Puntaje de cada equipo = promedio de sus integrantes (en 1v1, el del jugador).
+  execute format('select avg(%I) from public.profiles where id = any ($1)', c_elo) into v_a_avg using v_team_a;
+  execute format('select avg(%I) from public.profiles where id = any ($1)', c_elo) into v_b_avg using v_team_b;
 
   v_delta := case when p_match.reporter_won
                   then private.elo_delta(v_a_avg, v_b_avg)
                   else private.elo_delta(v_b_avg, v_a_avg) end;
 
-  -- Snapshot del ELO previo de cada jugador.
-  update public.matches m
-     set elo_delta = v_delta,
-         reporter_elo_before         = (select elo from public.profiles where id = m.reporter_id),
-         reporter_partner_elo_before = (select elo from public.profiles where id = m.reporter_partner_id),
-         opponent_elo_before         = (select elo from public.profiles where id = m.opponent_id),
-         opponent_partner_elo_before = (select elo from public.profiles where id = m.opponent_partner_id)
-   where m.id = p_match.id;
+  if p_is_mode then
+    execute format(
+      $q$update public.matches m
+            set elo_delta = $2,
+                reporter_elo_before         = (select %1$I from public.profiles where id = m.reporter_id),
+                reporter_partner_elo_before = (select %1$I from public.profiles where id = m.reporter_partner_id),
+                opponent_elo_before         = (select %1$I from public.profiles where id = m.opponent_id),
+                opponent_partner_elo_before = (select %1$I from public.profiles where id = m.opponent_partner_id)
+          where m.id = $1$q$,
+      c_elo
+    ) using p_match.id, v_delta;
+  else
+    update public.matches set global_elo_delta = v_delta where id = p_match.id;
+  end if;
 
   -- Mismo +Δ / -Δ para cada integrante. Todas las expresiones ven los valores previos.
   -- La racha solo se actualiza si el partido es el más reciente del jugador.
-  update public.profiles
-     set elo = elo + case when id = any (v_winners) then v_delta else -v_delta end,
-         matches_played = matches_played + 1,
-         wins   = wins   + case when id = any (v_winners) then 1 else 0 end,
-         losses = losses + case when id = any (v_winners) then 0 else 1 end,
-         win_streak = case
-                        when last_match_at is not null and v_as_of < last_match_at then win_streak
-                        when id = any (v_winners) then win_streak + 1
-                        else 0
-                      end,
-         best_win_streak = case
-                             when (last_match_at is null or v_as_of >= last_match_at) and id = any (v_winners)
-                             then greatest(best_win_streak, win_streak + 1)
-                             else best_win_streak
-                           end,
-         decay_weeks_applied = case when last_match_at is null or v_as_of > last_match_at
-                                    then 0 else decay_weeks_applied end,
-         last_match_at = greatest(coalesce(last_match_at, v_as_of), v_as_of)
-   where id = any (v_players);
+  execute format(
+    $q$update public.profiles
+          set %1$I = %1$I + case when id = any ($1) then $3 else -$3 end,
+              %2$I = %2$I + 1,
+              %3$I = %3$I + case when id = any ($1) then 1 else 0 end,
+              %4$I = %4$I + case when id = any ($1) then 0 else 1 end,
+              %5$I = case
+                       when %6$I is not null and $4 < %6$I then %5$I
+                       when id = any ($1) then %5$I + 1
+                       else 0
+                     end,
+              %7$I = case
+                       when (%6$I is null or $4 >= %6$I) and id = any ($1)
+                       then greatest(%7$I, %5$I + 1)
+                       else %7$I
+                     end,
+              %8$I = case when %6$I is null or $4 > %6$I then 0 else %8$I end,
+              %6$I = greatest(coalesce(%6$I, $4), $4)
+        where id = any ($2)$q$,
+    c_elo, c_played, c_wins, c_losses, c_streak, c_last, c_best, c_decay
+  ) using v_winners, v_players, v_delta, v_as_of;
 
-  insert into public.elo_events (profile_id, match_id, kind, mode, delta, elo_after, created_at)
-  select id, p_match.id, 'match', p_match.mode,
-         case when id = any (v_winners) then v_delta else -v_delta end, elo, v_as_of
-    from public.profiles
-   where id = any (v_players);
+  execute format(
+    $q$insert into public.elo_events (profile_id, match_id, kind, mode, scope, delta, elo_after, created_at)
+       select id, $1, 'match', $2, $3, case when id = any ($4) then $5 else -$5 end, %I, $6
+         from public.profiles
+        where id = any ($7)$q$,
+    c_elo
+  ) using p_match.id, p_match.mode, v_scope, v_winners, v_delta, v_as_of, v_players;
 
   return v_delta;
 end;
 $$;
 
--- Recalcula todos los ELO desde cero repasando los partidos confirmados en el
+-- Aplica el resultado de un partido (1v1 o 2v2): actualiza el ranking Global y el
+-- de su modalidad, cada uno contra sus propios puntajes. Devuelve el Δ de la modalidad.
+create or replace function private.settle_match(p_match public.matches)
+returns integer
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_players uuid[] := array_remove(
+    array[p_match.reporter_id, p_match.reporter_partner_id, p_match.opponent_id, p_match.opponent_partner_id], null
+  );
+  v_delta   integer;
+begin
+  -- Bloqueo en orden estable para evitar deadlocks entre confirmaciones simultáneas.
+  perform 1 from public.profiles where id = any (v_players) order by id for update;
+
+  perform private.settle_scope(p_match, '', false);
+  v_delta := private.settle_scope(
+    p_match,
+    case p_match.mode when 'singles' then 'singles_' else 'doubles_' end,
+    true
+  );
+  return v_delta;
+end;
+$$;
+
+-- Recalcula los tres rankings desde cero repasando los partidos confirmados en el
 -- orden en que se jugaron (y el decay correspondiente). Se usa al migrar o si
 -- cambian las reglas: select private.recalculate_ratings();
 create or replace function private.recalculate_ratings()
@@ -549,10 +640,15 @@ declare
 begin
   update public.profiles
      set elo = 1000, matches_played = 0, wins = 0, losses = 0,
-         last_match_at = null, decay_weeks_applied = 0, win_streak = 0, best_win_streak = 0
+         last_match_at = null, decay_weeks_applied = 0, win_streak = 0, best_win_streak = 0,
+         singles_elo = 1000, singles_matches_played = 0, singles_wins = 0, singles_losses = 0,
+         singles_last_match_at = null, singles_decay_weeks_applied = 0, singles_win_streak = 0, singles_best_win_streak = 0,
+         doubles_elo = 1000, doubles_matches_played = 0, doubles_wins = 0, doubles_losses = 0,
+         doubles_last_match_at = null, doubles_decay_weeks_applied = 0, doubles_win_streak = 0, doubles_best_win_streak = 0
    where true;
   delete from public.elo_events where true;
   delete from public.top_reigns where true;
+  update public.matches set global_elo_delta = null where true;
 
   for v_match in
     select * from public.matches where status = 'confirmed' order by created_at, id
@@ -831,13 +927,13 @@ as $$
   select
     p.id,
     coalesce((select e.elo_after from public.elo_events e
-               where e.profile_id = p.id and e.created_at < p_start
+               where e.profile_id = p.id and e.scope = 'global' and e.created_at < p_start
                order by e.created_at desc, e.id desc limit 1), 1000),
     coalesce((select e.elo_after from public.elo_events e
-               where e.profile_id = p.id and e.created_at < p_end
+               where e.profile_id = p.id and e.scope = 'global' and e.created_at < p_end
                order by e.created_at desc, e.id desc limit 1), 1000),
     (select count(*)::integer from public.elo_events e
-      where e.profile_id = p.id and e.kind = 'match' and e.created_at < p_end)
+      where e.profile_id = p.id and e.scope = 'global' and e.kind = 'match' and e.created_at < p_end)
   from public.profiles p;
 $$;
 
@@ -1042,15 +1138,21 @@ $$;
 
 -- ---------------------------------------------------------------------
 -- Migraciones de versiones anteriores. Si hace falta, se recalcula todo
--- desde cero con las reglas actuales (corre una sola vez):
---   · ELO único: se eliminan las columnas de dobles (versión con dos rankings).
+-- desde cero con las reglas actuales (corre una sola vez por cambio):
 --   · Rachas: se agregan win_streak / best_win_streak y se completan.
 --   · Días en el top 1: se reconstruye el historial de reinados.
+--   · Tres rankings: se calculan los de 1 vs 1 y 2 vs 2 con los partidos existentes.
 -- ---------------------------------------------------------------------
+
+create table if not exists private.migrations (
+  name        text primary key,
+  applied_at  timestamptz not null default now()
+);
 
 do $$
 declare
   v_recalc boolean := false;
+  v_rows   integer;
 begin
   if not exists (
     select 1 from information_schema.columns
@@ -1062,17 +1164,10 @@ begin
     v_recalc := true;
   end if;
 
-  if exists (
-    select 1 from information_schema.columns
-     where table_schema = 'public' and table_name = 'profiles' and column_name = 'elo_doubles'
-  ) then
-    alter table public.profiles
-      drop column if exists elo_doubles,
-      drop column if exists doubles_played,
-      drop column if exists doubles_wins,
-      drop column if exists doubles_losses,
-      drop column if exists doubles_last_match_at,
-      drop column if exists doubles_decay_weeks_applied;
+  -- Tres rankings: la primera vez hay que calcular 1 vs 1 y 2 vs 2.
+  insert into private.migrations (name) values ('three-rankings') on conflict do nothing;
+  get diagnostics v_rows = row_count;
+  if v_rows = 1 then
     v_recalc := true;
   end if;
 

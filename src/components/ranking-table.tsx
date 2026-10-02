@@ -4,7 +4,8 @@ import { PlayerAvatar } from "@/components/player-avatar";
 import { StreakBadge } from "@/components/streak-badge";
 import { fullName, playerHref } from "@/lib/format";
 import { MIN_MATCHES_TO_RANK } from "@/lib/elo";
-import type { Profile } from "@/lib/types";
+import { statsFor } from "@/lib/modes";
+import type { Profile, Scope } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 const MEDAL = [
@@ -16,10 +17,13 @@ const MEDAL = [
 /** Top 3 en formato podio: 2º · 1º · 3º. */
 export function Podium({
   players,
+  scope = "global",
   currentUserId,
   leaderDays = null,
 }: {
   players: Profile[];
+  /** Ranking que se muestra (Global, 1 vs 1 o 2 vs 2). */
+  scope?: Scope;
   currentUserId: string;
   /** Días que lleva el #1 en la cima (null si no hay registro). */
   leaderDays?: number | null;
@@ -30,6 +34,7 @@ export function Podium({
       {slots.map(({ index, player }) => {
         if (!player) return <div key={index} />;
         const medal = MEDAL[index];
+        const st = statsFor(player, scope);
         return (
           <Link prefetch={false}
             key={player.id}
@@ -51,15 +56,15 @@ export function Podium({
               >
                 {index + 1}
               </span>
-              <StreakBadge streak={player.win_streak} className="absolute -top-1 -right-3 ring-2 ring-card" />
+              <StreakBadge streak={st.streak} className="absolute -top-1 -right-3 ring-2 ring-card" />
             </div>
             <div className="mt-3 w-full truncate px-1 text-sm font-bold">
               {player.nickname}
               {player.id === currentUserId && <span className="text-primary"> ·vos</span>}
             </div>
-            <div className="text-lg leading-tight font-extrabold tabular-nums text-primary">{player.elo}</div>
+            <div className="text-lg leading-tight font-extrabold tabular-nums text-primary">{st.elo}</div>
             <div className="text-[0.7rem] text-muted-foreground tabular-nums">
-              {player.wins}V · {player.losses}D
+              {st.wins}V · {st.losses}D
             </div>
             {index === 0 && leaderDays !== null && (
               <div className="mt-1 rounded-full bg-amber-100 px-2 py-0.5 text-[0.65rem] font-bold text-amber-700 dark:bg-amber-400/15 dark:text-amber-300">
@@ -76,11 +81,14 @@ export function Podium({
 
 export function RankingTable({
   players,
+  scope = "global",
   currentUserId,
   ranked,
   startIndex = 0,
 }: {
   players: Profile[];
+  /** Ranking que se muestra (Global, 1 vs 1 o 2 vs 2). */
+  scope?: Scope;
   currentUserId: string;
   ranked: boolean;
   startIndex?: number;
@@ -90,6 +98,7 @@ export function RankingTable({
       {players.map((p, i) => {
         const position = startIndex + i + 1;
         const isMe = p.id === currentUserId;
+        const st = statsFor(p, scope);
         return (
           <li key={p.id}>
             <Link prefetch={false}
@@ -119,19 +128,19 @@ export function RankingTable({
                       Vos
                     </span>
                   )}
-                  <StreakBadge streak={p.win_streak} />
+                  <StreakBadge streak={st.streak} />
                 </div>
                 <div className="truncate text-xs text-muted-foreground">
-                  {fullName(p)} · {p.matches_played} PJ
+                  {fullName(p)} · {st.played} PJ
                 </div>
-                {!ranked && <MatchesProgress played={p.matches_played} className="mt-1" />}
+                {!ranked && <MatchesProgress played={st.played} className="mt-1" />}
               </div>
               <div className="shrink-0 text-right">
-                <div className="text-lg leading-tight font-extrabold tabular-nums">{p.elo}</div>
+                <div className="text-lg leading-tight font-extrabold tabular-nums">{st.elo}</div>
                 <div className="text-[0.7rem] font-semibold tabular-nums">
-                  <span className="text-success">{p.wins}G</span>
+                  <span className="text-success">{st.wins}G</span>
                   <span className="text-muted-foreground"> · </span>
-                  <span className="text-destructive">{p.losses}P</span>
+                  <span className="text-destructive">{st.losses}P</span>
                 </div>
               </div>
             </Link>

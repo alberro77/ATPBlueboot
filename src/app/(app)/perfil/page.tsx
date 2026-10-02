@@ -25,7 +25,7 @@ export default async function ProfilePage() {
     <div className="mx-auto grid max-w-lg gap-4">
       <ProfileHero profile={me} isMe {...data} />
       <StatsCard profile={me} matches={data.matches} />
-      <ModeStatsCards matches={data.matches} playerId={me.id} />
+      <ModeStatsCards matches={data.matches} playerId={me.id} profile={me} ranks={data.ranks} />
       <EloChart points={data.eloHistory} nowMs={nowMs()} title="Tu AURA en el tiempo" />
       <RelationCards rival={rival} partner={partner} viewerId={me.id} />
       <NotificationSettings

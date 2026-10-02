@@ -54,7 +54,7 @@ export default async function PlayerPage({ params }: PageProps<"/jugador/[id]">)
       <ProfileHero profile={player} isMe={false} {...data} />
       <HeadToHead player={player} me={me} matches={data.matches} />
       <StatsCard profile={player} matches={data.matches} />
-      <ModeStatsCards matches={data.matches} playerId={player.id} />
+      <ModeStatsCards matches={data.matches} playerId={player.id} profile={player} ranks={data.ranks} />
       <EloChart points={data.eloHistory} nowMs={nowMs()} />
       <RelationCards
         rival={rival}
@@ -144,8 +144,8 @@ function HeadToHead({ player, me, matches }: { player: Profile; me: Profile; mat
         <WinChance
           className="border-t pt-3"
           title="Si juegan hoy"
-          myElo={me.elo}
-          rivalElo={player.elo}
+          myElo={me.singles_elo}
+          rivalElo={player.singles_elo}
           rivalLabel={player.nickname}
         />
         {together > 0 && (

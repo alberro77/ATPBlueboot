@@ -77,8 +77,9 @@ export function ReportMatchForm({
   const rivals = (doubles ? [slots.rival1, slots.rival2] : [slots.rival1]).map(byId);
   const ready = order.every((k) => slots[k]);
   const myTeam = doubles ? [me, partner] : [me];
-  const myElo = ready ? teamElo(myTeam as PlayerSummary[]) : 0;
-  const rivalElo = ready ? teamElo(rivals as PlayerSummary[]) : 0;
+  // Los puntos en juego se calculan contra el ranking de la modalidad elegida.
+  const myElo = ready ? teamElo(myTeam as PlayerSummary[], mode) : 0;
+  const rivalElo = ready ? teamElo(rivals as PlayerSummary[], mode) : 0;
   // Lo que se gana / pierde en el próximo partido de la serie.
   const afterSoFar = seriesDelta(myElo, rivalElo, results);
   const gain = ready ? eloDelta(myElo + afterSoFar, rivalElo - afterSoFar) : null;
@@ -265,6 +266,7 @@ export function ReportMatchForm({
           players={availableFor(sheetSlot)}
           recentIds={recentIds}
           selectedId={slots[sheetSlot]}
+          mode={mode}
           onPick={(id) => setSlot(sheetSlot, id)}
         />
       )}

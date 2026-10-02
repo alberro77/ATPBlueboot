@@ -52,6 +52,7 @@ export default async function MyMatchesPage() {
       .select("id, kind, mode, delta, elo_after, created_at")
       .eq("profile_id", me.id)
       .eq("kind", "decay")
+      .eq("scope", "global")
       .gte("created_at", daysAgoIso(30)),
     supabase
       .from("challenges")
@@ -242,7 +243,7 @@ function IncomingCard({ group, me }: { group: PendingGroup; me: Profile }) {
   const results = myResults(group, me.id);
   const wins = results.filter(Boolean).length;
   const series = results.length > 1;
-  const preview = seriesDelta(teamElo(myTeam), teamElo(p.rivals), results);
+  const preview = seriesDelta(teamElo(myTeam, match.mode), teamElo(p.rivals, match.mode), results);
   const doubles = match.mode === "doubles";
   const iWonMore = wins * 2 > results.length;
   const tie = wins * 2 === results.length;

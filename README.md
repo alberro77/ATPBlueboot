@@ -4,7 +4,7 @@ Ranking AURA de ping pong de BlueBoot. Mobile-first, hecho con Next.js 16 (App R
 
 ## Funcionalidades
 
-- **Ranking único**: 1 vs 1 y 2 vs 2 suman la misma AURA. Tarjeta con tu posición, franja **On fire** con los jugadores en racha (3+ victorias seguidas), podio para el top 3 (el #1 muestra cuántos días lleva en la cima) y tabla con el resto. Ranking oficial (3+ partidos confirmados) y pestaña "Sin clasificar".
+- **Tres rankings**: **Global** (el principal, con todos los partidos), **1 vs 1** y **2 vs 2**, con un selector arriba del ranking. Cada uno tiene su propio puntaje de AURA, récord, rachas, ranking oficial (3+ partidos en ese ranking) y "Sin clasificar". Se ven la tarjeta con tu posición, la franja **On fire**, el podio y la lista. En el perfil aparecen tu posición y tu AURA en los tres.
 - **Cargar partidos en segundos**: una sola pantalla con tu equipo contra los rivales. Tocás un lugar vacío (o un jugador de "Jugaste hace poco") y después **Gané** / **Perdí** una vez por cada partido, en orden: así se cargan series de varios partidos entre los mismos jugadores de una vez. Muestra la **probabilidad de ganar** (según el AURA), lo que se juega en cada partido y el total estimado. No se carga el marcador.
 - **Mis partidos**: partidos para confirmar o rechazar (una serie se confirma o rechaza completa con un toque), los que esperan al rival (los podés cancelar si los cargaste vos) e historial.
 - **Perfil**: tu AURA, posición y **días en el #1**, estadísticas (jugados, ganados, perdidos, efectividad, últimos 5, racha actual y mejor racha), **gráfico de evolución del AURA** (1 mes / 3 meses / todo, con detalle de cada cambio al tocar), **clásico rival** (con quien más jugaste 1 vs 1) y **compañero** (con quien más jugaste juntos en 2 vs 2). Datos y foto editables.
@@ -22,18 +22,18 @@ Todas viven en la base de datos (`supabase/schema.sql`), en funciones `security 
 
 | Regla | Implementación |
 | --- | --- |
-| AURA única, inicial 1000, K = 32 | `E = 1/(1+10^((Rperdedor-Rganador)/400))`, `Δ = max(1, round(32·(1-E)))`. Ganar siempre suma al menos 1 |
-| 2 vs 2 | El AURA de cada equipo es el promedio de sus integrantes y los 4 jugadores suman o restan el mismo Δ. Un compañero fuerte sube el promedio del equipo, así que ganar con él da menos puntos: nadie sube "colgado" |
+| Tres rankings | **Global**, **1 vs 1** y **2 vs 2**. Inicial 1000, K = 32 en cada uno. Cada partido confirmado actualiza **dos tablas**: la Global y la de su modalidad, y **cada una se calcula contra sus propios puntajes** (`E = 1/(1+10^((Rperdedor-Rganador)/400))`, `Δ = max(1, round(32·(1-E)))`). Ganar siempre suma al menos 1. Los puntos que se ven al cargar y al confirmar son los de la modalidad |
+| 2 vs 2 | El puntaje de cada equipo es el promedio de sus integrantes **en el ranking de 2 vs 2**, y los 4 jugadores suman o restan el mismo Δ. Un compañero fuerte sube el promedio del equipo, así que ganar con él da menos puntos |
 | Suma cero | Lo que gana un equipo es exactamente lo que pierde el otro; no se crean ni se pierden puntos por los partidos |
 | Doble validación | `report_match()` / `report_doubles_match()` crean el partido como `pending`. Confirma o rechaza el rival; en 2v2 alcanza con cualquiera de los dos. El AURA cambia recién al confirmar |
-| Mínimo 3 partidos | 3+ partidos confirmados (1v1 y 2v2 suman) para entrar al ranking oficial |
-| Decay por inactividad | Clasificado con 7+ días sin jugar: −10 por cada semana (7 días −10, 14 días −20, etc.). Cuenta la fecha en que **se jugó** el partido: si una confirmación tardía demuestra que el jugador sí jugó, se le devuelven las semanas cobradas de más. Lo aplica `apply_inactivity_decay()` a diario vía `pg_cron` y al abrir el ranking. Es idempotente |
+| Mínimo 3 partidos | 3+ partidos confirmados **en ese ranking** (el Global cuenta 1 vs 1 y 2 vs 2) para entrar a su ranking oficial |
+| Decay por inactividad | **En cada ranking por separado**: clasificado con 7+ días sin jugar en ese ranking: −10 por cada semana (7 días −10, 14 días −20, etc.). Cuenta la fecha en que **se jugó** el partido: si una confirmación tardía demuestra que el jugador sí jugó, se le devuelven las semanas cobradas de más. Lo aplica `apply_inactivity_decay()` a diario vía `pg_cron` y al abrir el ranking. Es idempotente |
 | Resultado | Solo se carga quién ganó (`reporter_won`). Los partidos viejos con marcador lo conservan |
 | Series | `report_series()` carga hasta 20 partidos seguidos entre los mismos jugadores (comparten `batch_id`, en el orden en que se jugaron); `confirm_batch()` / `reject_batch()` / `cancel_batch()` los resuelven juntos |
 | Rachas | `win_streak` (victorias seguidas actuales) y `best_win_streak`. Un partido confirmado tarde y anterior al último no corta ni alarga la racha |
 | Días en el #1 | `top_reigns` registra cada período como #1 del ranking oficial; se actualiza al confirmar partidos y al aplicar decay |
 | Temporadas | Mes calendario en hora de Argentina. `season_elo(inicio, fin)` devuelve el AURA de cada jugador al inicio y al cierre; el resumen se calcula a partir de los partidos confirmados, así que siempre coincide con los datos |
-| Recalcular | `select private.recalculate_ratings();` recalcula todos los AURA desde cero repasando los partidos confirmados en el orden en que se jugaron. Se ejecutó automáticamente al pasar de dos rankings a uno |
+| Recalcular | `select private.recalculate_ratings();` recalcula los tres rankings desde cero repasando los partidos confirmados en el orden en que se jugaron. Se ejecuta automáticamente la primera vez que se pasa a tres rankings |
 
 ## Notificaciones push (configuración)
 
@@ -56,6 +56,15 @@ Sin ellas la app funciona igual, pero no se envían avisos.
 - **Fotos**: un único archivo por usuario (`avatars/<user_id>/avatar`, máx. 512 KB) y el perfil solo acepta links a ese archivo.
 - **Headers**: `X-Frame-Options: DENY`, `frame-ancestors 'none'`, `nosniff`, `Referrer-Policy` y `Permissions-Policy`.
 - **Recomendado en los paneles**: Supabase → Authentication → Rate Limits (dejar los valores por defecto o bajarlos) y largo mínimo de contraseña 8; activar 2FA en las cuentas de Supabase, Vercel y GitHub; ante un ataque, Vercel → Firewall → Attack Challenge Mode.
+
+## Dejar todo en cero antes de empezar (conservando a los usuarios)
+
+Para borrar los partidos de prueba y empezar de cero sin tocar las cuentas:
+
+1. Corré `supabase/schema.sql` (crea los tres rankings).
+2. Corré `supabase/reset-data.sql` en el SQL Editor de Supabase.
+
+Borra partidos, series, desafíos, historial de puntaje y días en el #1, y deja los tres puntajes en 1000. **Conserva** las cuentas, los perfiles (nombre, apodo y foto) y las notificaciones activadas. No se puede deshacer.
 
 ## Puesta en marcha
 
