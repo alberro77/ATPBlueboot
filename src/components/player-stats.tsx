@@ -51,7 +51,7 @@ export function StatsCard({ profile, matches }: { profile: Profile; matches: Mat
                 key={i}
                 className={cn(
                   "flex size-6 items-center justify-center rounded-full text-[0.65rem] font-bold text-white",
-                  won ? "bg-success" : "bg-destructive",
+                  won ? "bg-emerald-700" : "bg-red-600",
                 )}
               >
                 {won ? "V" : "D"}
@@ -322,7 +322,7 @@ function ModeCard({ mode, record: r }: { mode: Mode; record: ModeRecord }) {
                   key={i}
                   className={cn(
                     "flex size-6 items-center justify-center rounded-full text-[0.65rem] font-bold text-white",
-                    won ? "bg-success" : "bg-destructive",
+                    won ? "bg-emerald-700" : "bg-red-600",
                   )}
                 >
                   {won ? "V" : "D"}

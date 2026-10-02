@@ -131,6 +131,10 @@
 }
 
 @layer base {
+  /* Los elementos de una grilla se pueden achicar: sin esto, un texto largo ensancha toda la columna. */
+  .grid > * {
+    min-width: 0;
+  }
   * {
     @apply border-border outline-ring/50;
   }

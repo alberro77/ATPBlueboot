@@ -26,8 +26,8 @@ export function ProfileHero({
         <PlayerAvatar player={profile} size={88} className="ring-4 ring-white/60" />
         <StreakBadge streak={profile.win_streak} className="absolute -right-2 bottom-0 text-xs ring-2 ring-white/80" />
       </div>
-      <div>
-        <h1 className="text-2xl font-extrabold">{profile.nickname}</h1>
+      <div className="max-w-full min-w-0">
+        <h1 className="text-2xl font-extrabold [overflow-wrap:anywhere]">{profile.nickname}</h1>
         <p className="text-sm text-white/75">{fullName(profile)}</p>
       </div>
       <div className="mt-1 flex items-center gap-5">

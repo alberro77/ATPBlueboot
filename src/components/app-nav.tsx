@@ -24,7 +24,7 @@ function PendingBadge({ count, className }: { count: number; className?: string 
     <span
       aria-label={`${count} pendientes`}
       className={cn(
-        "flex min-w-4.5 items-center justify-center rounded-full bg-destructive px-1 text-[0.65rem] leading-4.5 font-bold text-white ring-2 ring-background",
+        "flex min-w-4.5 items-center justify-center rounded-full bg-red-600 px-1 text-[0.65rem] leading-4.5 font-bold text-white ring-2 ring-background",
         className,
       )}
     >

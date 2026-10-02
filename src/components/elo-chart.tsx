@@ -123,7 +123,7 @@ export function EloChart({ points, nowMs, title = "Evolución del AURA" }: { poi
                 setActive(null);
               }}
               className={cn(
-                "rounded-full px-3 py-1 text-xs font-semibold text-muted-foreground transition-colors",
+                "rounded-full px-3.5 py-1.5 text-xs font-semibold text-muted-foreground transition-colors",
                 range === r.key && "bg-card text-foreground shadow-sm",
               )}
             >
@@ -142,7 +142,7 @@ export function EloChart({ points, nowMs, title = "Evolución del AURA" }: { poi
           en el período
         </p>
 
-        <div ref={wrapRef} className="relative">
+        <div ref={wrapRef} className="relative w-full" style={{ height: HEIGHT }}>
           {width > 0 && (
             <svg
               width={width}
@@ -150,7 +150,7 @@ export function EloChart({ points, nowMs, title = "Evolución del AURA" }: { poi
               role="img"
               aria-label={`${title}: de ${data[0].elo} a ${last.elo}. Usá las flechas para recorrer los puntos.`}
               tabIndex={0}
-              className="touch-pan-y outline-none focus-visible:rounded-lg focus-visible:ring-3 focus-visible:ring-ring/40"
+              className="absolute top-0 left-0 touch-pan-y outline-none focus-visible:rounded-lg focus-visible:ring-3 focus-visible:ring-ring/40"
               onPointerMove={(e) => setActive(nearest(e.clientX, e.currentTarget.getBoundingClientRect()))}
               onPointerDown={(e) => setActive(nearest(e.clientX, e.currentTarget.getBoundingClientRect()))}
               onPointerLeave={() => setActive(null)}
