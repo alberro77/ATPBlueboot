@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { ThemeProvider } from "next-themes";
+import { IosViewportFix } from "@/components/ios-viewport-fix";
 import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
 
@@ -49,6 +50,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
           {children}
           <Toaster richColors position="top-center" />
+          <IosViewportFix />
         </ThemeProvider>
       </body>
     </html>
