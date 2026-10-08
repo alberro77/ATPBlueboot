@@ -74,7 +74,12 @@ function legacyScore(m: MatchWithPlayers, teamAFirst: boolean) {
   return teamAFirst ? `${m.reporter_score}-${m.opponent_score}` : `${m.opponent_score}-${m.reporter_score}`;
 }
 
-/** Un partido visto desde un jugador: su equipo, los rivales, el resultado y el AURA ganada/perdida. */
+const signedFor = (d: number | null, won: boolean) => (d === null ? null : won ? d : -d);
+
+/**
+ * Un partido visto desde un jugador: su equipo, los rivales, el resultado y el AURA
+ * ganada/perdida: `delta` en el Global y `modeDelta` en el ranking de su modalidad.
+ */
 export function perspective(match: MatchWithPlayers, playerId: string) {
   const onTeamA = match.reporter_id === playerId || match.reporter_partner_id === playerId;
   const won = onTeamA === match.reporter_won;
@@ -84,7 +89,8 @@ export function perspective(match: MatchWithPlayers, playerId: string) {
     partner: myTeam.find((p) => p.id !== playerId) ?? null,
     rivals: onTeamA ? teamB(match) : teamA(match),
     score: legacyScore(match, onTeamA),
-    delta: match.elo_delta === null ? null : won ? match.elo_delta : -match.elo_delta,
+    delta: signedFor(match.global_elo_delta, won),
+    modeDelta: signedFor(match.elo_delta, won),
   };
 }
 
@@ -189,7 +195,7 @@ function Side({
 export function MatchRow({ match }: { match: MatchWithPlayers }) {
   const [winners, losers] = match.reporter_won ? [teamA(match), teamB(match)] : [teamB(match), teamA(match)];
   const score = legacyScore(match, match.reporter_won);
-  const delta = match.elo_delta;
+  const delta = match.global_elo_delta;
 
   return (
     <li className="px-4 py-3">

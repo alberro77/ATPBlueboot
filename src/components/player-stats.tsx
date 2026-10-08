@@ -235,7 +235,7 @@ export function computeModeRecord(matches: MatchWithPlayers[], playerId: string,
   for (const m of list) {
     const p = perspective(m, playerId);
     results.push(p.won);
-    eloChange += p.delta ?? 0;
+    eloChange += p.modeDelta ?? 0;
     if (p.won) {
       wins++;
       streak++;

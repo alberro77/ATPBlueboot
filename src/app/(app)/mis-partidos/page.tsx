@@ -240,7 +240,8 @@ function IncomingCard({ group, me }: { group: PendingGroup; me: Profile }) {
   const results = myResults(group, me.id);
   const wins = results.filter(Boolean).length;
   const series = results.length > 1;
-  const preview = seriesDelta(teamElo(myTeam, match.mode), teamElo(p.rivals, match.mode), results);
+  // Vista previa en el ranking Global ("AURA" a secas = Global).
+  const preview = seriesDelta(teamElo(myTeam, "global"), teamElo(p.rivals, "global"), results);
   const doubles = match.mode === "doubles";
   const iWonMore = wins * 2 > results.length;
   const tie = wins * 2 === results.length;

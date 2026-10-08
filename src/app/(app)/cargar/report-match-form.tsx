@@ -77,13 +77,17 @@ export function ReportMatchForm({
   const rivals = (doubles ? [slots.rival1, slots.rival2] : [slots.rival1]).map(byId);
   const ready = order.every((k) => slots[k]);
   const myTeam = doubles ? [me, partner] : [me];
-  // Los puntos en juego se calculan contra el ranking de la modalidad elegida.
-  const myElo = ready ? teamElo(myTeam as PlayerSummary[], mode) : 0;
-  const rivalElo = ready ? teamElo(rivals as PlayerSummary[], mode) : 0;
+  // Los puntos que se muestran son los del ranking Global ("AURA" a secas = Global).
+  const myElo = ready ? teamElo(myTeam as PlayerSummary[], "global") : 0;
+  const rivalElo = ready ? teamElo(rivals as PlayerSummary[], "global") : 0;
   // Lo que se gana / pierde en el próximo partido de la serie.
   const afterSoFar = seriesDelta(myElo, rivalElo, results);
   const gain = ready ? eloDelta(myElo + afterSoFar, rivalElo - afterSoFar) : null;
   const loss = ready ? eloDelta(rivalElo - afterSoFar, myElo + afterSoFar) : null;
+  // Las chances (solo 1 vs 1) usan el AURA 1 vs 1, que es lo que predice este tipo de partido.
+  const mySingles = ready && !doubles ? teamElo([me], "singles") : 0;
+  const rivalSingles = ready && !doubles ? teamElo(rivals as PlayerSummary[], "singles") : 0;
+  const singlesSoFar = seriesDelta(mySingles, rivalSingles, results);
   const wins = results.filter(Boolean).length;
 
   const taken = new Set(order.map((k) => slots[k]).filter(Boolean));
@@ -201,8 +205,8 @@ export function ReportMatchForm({
         <WinChance
           className="rounded-2xl border bg-card p-4 shadow-sm"
           title={results.length === 0 ? "Chances" : "Chances en el próximo"}
-          myElo={myElo + afterSoFar}
-          rivalElo={rivalElo - afterSoFar}
+          myElo={mySingles + singlesSoFar}
+          rivalElo={rivalSingles - singlesSoFar}
           rivalLabel={rivals[0]!.nickname}
         />
       )}

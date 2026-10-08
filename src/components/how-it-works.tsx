@@ -6,7 +6,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 
 const RULES = [
   { icon: Sparkles, title: "AURA", text: "Tu puntaje. Arrancás en 1000. Ganarle a alguien mejor suma más." },
-  { icon: Globe, title: "3 rankings", text: "Global cuenta todo. 1 vs 1 y 2 vs 2, cada uno por separado." },
+  { icon: Globe, title: "3 rankings", text: "Global cuenta todo y es tu AURA principal. 1 vs 1 y 2 vs 2, cada uno por separado." },
   { icon: CheckCheck, title: "Confirmación", text: "Tu rival confirma el partido y recién ahí suma." },
   { icon: Trophy, title: "Clasificar", text: "Entrás al ranking con 3 partidos." },
   { icon: Clock, title: "Inactividad", text: "Después de 7 días sin jugar, −10 por semana." },

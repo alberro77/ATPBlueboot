@@ -1,7 +1,7 @@
 // Espejo de private.elo_delta() en supabase/schema.sql.
 // Solo se usa para previsualizar; el cálculo real lo hace la base de datos.
 
-import type { Mode } from "./types";
+import type { Scope } from "./types";
 
 export const INITIAL_ELO = 1000;
 export const K_FACTOR = 32;
@@ -18,12 +18,14 @@ export function eloDelta(winnerElo: number, loserElo: number) {
   return Math.max(1, Math.round(K_FACTOR * (1 - expectedScore(winnerElo, loserElo))));
 }
 
+type Ratings = { elo: number; singles_elo: number; doubles_elo: number };
+
 /**
- * AURA de un equipo en el ranking de una modalidad: promedio de sus integrantes
- * (en 1 vs 1, el del jugador). Los partidos se calculan contra el ranking de su modalidad.
+ * AURA de un equipo en uno de los rankings: promedio de sus integrantes
+ * (en 1 vs 1, el del jugador). Cada partido se calcula en el Global y en el de su modalidad.
  */
-export function teamElo(players: { singles_elo: number; doubles_elo: number }[], mode: Mode) {
-  const rating = (p: { singles_elo: number; doubles_elo: number }) => (mode === "singles" ? p.singles_elo : p.doubles_elo);
+export function teamElo(players: Ratings[], scope: Scope) {
+  const rating = (p: Ratings) => (scope === "singles" ? p.singles_elo : scope === "doubles" ? p.doubles_elo : p.elo);
   return players.reduce((sum, p) => sum + rating(p), 0) / players.length;
 }
 
